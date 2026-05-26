@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sharp de Limpieza</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>Sharp de Limpieza</h1>
+    <p>Calendario de ejecucion diaria con control de pendientes y realizadas.</p>
+  </header>
+
+  <main class="layout">
+    <section class="board-section">
+      <div class="toolbar">
+        <form id="collaborator-form">
+          <label for="collaborator-name">Nuevo colaborador</label>
+          <div class="input-row">
+            <input id="collaborator-name" name="collaboratorName" type="text" maxlength="40" placeholder="Ej: Daniela" required>
+            <button type="submit">Agregar</button>
+          </div>
+        </form>
+        <button id="load-example" class="secondary" type="button">Cargar ejemplo</button>
+      </div>
+
+      <div class="table-wrap">
+        <table id="schedule-table">
+          <thead>
+            <tr>
+              <th class="header-colaboradores">Colaboradores</th>
+              <th>Lunes</th>
+              <th>Martes</th>
+              <th>Miercoles</th>
+              <th>Jueves</th>
+              <th>Viernes</th>
+            </tr>
+          </thead>
+          <tbody id="schedule-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="side-panel">
+      <section class="card">
+        <h2>Editar casilla</h2>
+        <p id="selected-cell-label">Selecciona una casilla del calendario para cargar la tarea.</p>
+
+        <form id="task-form">
+          <label for="task-text">Tarea diaria</label>
+          <textarea id="task-text" rows="4" maxlength="180" placeholder="Ej: Limpiar area de recepcion"></textarea>
+
+          <label for="task-team">Equipo</label>
+          <select id="task-team"></select>
+
+          <label class="checkbox-row" for="task-done">
+            <input id="task-done" type="checkbox">
+            Marcar como realizada
+          </label>
+
+          <div class="action-row">
+            <button type="submit">Guardar tarea</button>
+            <button id="clear-task" type="button" class="secondary">Limpiar casilla</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Resumen</h2>
+        <div class="filter-row">
+          <label for="team-filter">Equipo para ver realizadas</label>
+          <select id="team-filter"></select>
+        </div>
+        <div class="summary-columns">
+          <div>
+            <h3>Pendientes (<span id="pending-count">0</span>)</h3>
+            <ul id="pending-list" class="task-list"></ul>
+          </div>
+          <div>
+            <h3>Realizadas (<span id="done-count">0</span>)</h3>
+            <ul id="done-list" class="task-list"></ul>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
