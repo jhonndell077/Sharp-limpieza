@@ -62,17 +62,18 @@
 
         <!-- Formulario para agregar tarea -->
         <div class="modal-add-section">
-          <strong class="modal-section-title">Agregar tarea</strong>
+          <strong class="modal-section-title">Agregar tareas</strong>
           <label class="modal-field">
             <span>Paso 1 — Equipo</span>
             <select id="task-team"></select>
           </label>
-          <label class="modal-field">
-            <span>Paso 2 — Tarea</span>
-            <select id="task-item"></select>
-          </label>
-          <p id="task-frequency-hint" class="hint-text">Selecciona equipo y tarea para ver la frecuencia del sharp.</p>
-          <button type="button" id="add-task-btn">+ Agregar tarea</button>
+          <div class="modal-field">
+            <span class="modal-field-label">Paso 2 — Selecciona las tareas</span>
+            <div id="task-checklist" class="task-checklist">
+              <p class="checklist-empty">Selecciona un equipo primero.</p>
+            </div>
+          </div>
+          <button type="button" id="add-task-btn" disabled>+ Agregar seleccionadas</button>
         </div>
 
         <!-- Libre -->

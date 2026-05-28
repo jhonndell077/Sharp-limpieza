@@ -135,11 +135,10 @@ const TASK_INDEX = buildTaskIndex();
 const collaboratorForm  = document.getElementById("collaborator-form");
 const collaboratorInput = document.getElementById("collaborator-name");
 const scheduleBody      = document.getElementById("schedule-body");
-const taskTeam          = document.getElementById("task-team");
-const taskItem          = document.getElementById("task-item");
-const taskFree          = document.getElementById("task-free");
-const taskFrequencyHint = document.getElementById("task-frequency-hint");
-const addTaskBtn        = document.getElementById("add-task-btn");
+const taskTeam       = document.getElementById("task-team");
+const taskChecklist  = document.getElementById("task-checklist");
+const taskFree       = document.getElementById("task-free");
+const addTaskBtn     = document.getElementById("add-task-btn");
 const clearTaskButton   = document.getElementById("clear-task");
 const syncStatus        = document.getElementById("sync-status");
 const modalOverlay      = document.getElementById("cell-modal-overlay");
@@ -203,12 +202,10 @@ scheduleBody.addEventListener("click", (event) => {
 });
 
 taskTeam.addEventListener("change", () => {
-  updateTaskOptions(taskTeam.value, "");
-  syncAddForm();
+  renderTaskChecklist(taskTeam.value);
 });
 
-taskItem.addEventListener("change", () => {
-  updateTaskHint(taskTeam.value, taskItem.value);
+taskChecklist.addEventListener("change", () => {
   syncAddForm();
 });
 
@@ -223,34 +220,33 @@ taskFree.addEventListener("change", () => {
   saveState();
   renderTable();
   renderModalTaskList();
-  syncAddForm();
+  renderTaskChecklist(taskFree.checked ? "" : taskTeam.value);
 });
 
 addTaskBtn.addEventListener("click", () => {
   if (!selectedCell) return;
   const team = taskTeam.value.trim();
-  const taskId = taskItem.value.trim();
-  if (!team || !taskId) return;
+  if (!team) return;
+
+  const checked = Array.from(taskChecklist.querySelectorAll("input[type='checkbox']:checked:not(:disabled)"));
+  if (checked.length === 0) return;
 
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
   if (!state.tasks[key]) state.tasks[key] = { free: false, items: [] };
   const cellData = state.tasks[key];
   if (cellData.free) return;
 
-  if (cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
-    window.alert("Esta tarea ya esta asignada en este dia.");
-    return;
+  for (const cb of checked) {
+    const taskId = cb.value;
+    if (!cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
+      cellData.items.push({ id: createId(), team, taskId, done: false });
+    }
   }
 
-  cellData.items.push({ id: createId(), team, taskId, done: false });
   saveState();
   renderTable();
   renderModalTaskList();
-
-  taskTeam.value = "";
-  updateTaskOptions("", "");
-  taskFrequencyHint.textContent = "Selecciona equipo y tarea para ver la frecuencia del sharp.";
-  syncAddForm();
+  renderTaskChecklist(team);
 });
 
 // Event delegation para lista de tareas del modal
@@ -274,7 +270,7 @@ clearTaskButton.addEventListener("click", () => {
   saveState();
   renderTable();
   renderModalTaskList();
-  syncAddForm();
+  renderTaskChecklist(taskTeam.value);
 });
 
 modalCloseBtn.addEventListener("click", closeModal);
@@ -297,8 +293,7 @@ function openModal() {
   taskFree.checked = Boolean(cellData && cellData.free);
 
   taskTeam.value = "";
-  updateTaskOptions("", "");
-  taskFrequencyHint.textContent = "Selecciona equipo y tarea para ver la frecuencia del sharp.";
+  renderTaskChecklist("");
 
   renderModalTaskList();
   syncAddForm();
@@ -367,8 +362,41 @@ function removeTask(index) {
 function syncAddForm() {
   const isFree = taskFree.checked;
   taskTeam.disabled = isFree;
-  taskItem.disabled = isFree || !taskTeam.value || !hasTeam(taskTeam.value);
-  addTaskBtn.disabled = isFree || !taskTeam.value || !taskItem.value;
+  const hasChecked = taskChecklist.querySelectorAll("input[type='checkbox']:checked:not(:disabled)").length > 0;
+  addTaskBtn.disabled = isFree || !taskTeam.value || !hasChecked;
+}
+
+function renderTaskChecklist(team) {
+  if (!team || !hasTeam(team)) {
+    taskChecklist.innerHTML = '<p class="checklist-empty">Selecciona un equipo primero.</p>';
+    syncAddForm();
+    return;
+  }
+
+  const tasks = TASK_LIBRARY[team] || [];
+  taskChecklist.innerHTML = tasks.map((task) => {
+    const legend = LEGEND[task.color] || LEGEND.none;
+    const assigned = isTaskAssigned(team, task.id);
+    const assignedClass = assigned ? "checklist-item-assigned" : "";
+    const disabledAttr = assigned ? "disabled checked" : "";
+    return `
+      <label class="checklist-item ${assignedClass}">
+        <input type="checkbox" value="${task.id}" ${disabledAttr}>
+        <span>${legend.symbol}</span>
+        <span class="checklist-name">${escapeHtml(task.name)}</span>
+        <span class="checklist-freq">${escapeHtml(legend.short)}</span>
+      </label>`;
+  }).join("");
+
+  syncAddForm();
+}
+
+function isTaskAssigned(team, taskId) {
+  if (!selectedCell) return false;
+  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+  const cellData = state.tasks[key];
+  if (!cellData || !Array.isArray(cellData.items)) return false;
+  return cellData.items.some((item) => item.team === team && item.taskId === taskId);
 }
 
 // ── State ─────────────────────────────────────────────────────────────
@@ -610,35 +638,8 @@ function updateTeamSelectors() {
     [{ value: "", label: "Seleccionar equipo" }, ...teams.map((t) => ({ value: t, label: t }))],
     taskTeam.value
   );
-  updateTaskOptions(taskTeam.value, taskItem.value);
 }
 
-function updateTaskOptions(team, selectedTaskId) {
-  if (!team || !hasTeam(team)) {
-    setSelectOptions(taskItem, [{ value: "", label: "Selecciona un equipo primero" }], "");
-    taskItem.disabled = true;
-    updateTaskHint("", "");
-    return;
-  }
-  const options = (TASK_LIBRARY[team] || []).map((task) => {
-    const legend = LEGEND[task.color] || LEGEND.none;
-    return { value: task.id, label: `${legend.symbol} ${task.name} - ${legend.short}` };
-  });
-  setSelectOptions(taskItem, [{ value: "", label: "Seleccionar tarea" }, ...options], selectedTaskId);
-  taskItem.disabled = false;
-  updateTaskHint(team, taskItem.value);
-}
-
-function updateTaskHint(team, taskId) {
-  if (!team || !taskId) {
-    taskFrequencyHint.textContent = "Selecciona equipo y tarea para ver la frecuencia del sharp.";
-    return;
-  }
-  const task = findTask(team, taskId);
-  if (!task) { taskFrequencyHint.textContent = "No se encontro la tarea."; return; }
-  const legend = LEGEND[task.color] || LEGEND.none;
-  taskFrequencyHint.textContent = `${legend.symbol} ${task.name}: ${legend.label}`;
-}
 
 function collectTeamsFromState() {
   const known = new Set(TEAM_NAMES);
