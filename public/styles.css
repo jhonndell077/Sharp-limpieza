@@ -193,6 +193,26 @@ thead th {
   width: 124px;
 }
 
+th.weekend {
+  background: #4a7a33;
+}
+
+td.task-cell.weekend {
+  background: #eef4eb;
+}
+
+td.task-cell.weekend .cell-btn {
+  background: #e4efe0;
+}
+
+td.task-cell.weekend .cell-btn.pending {
+  background: #d8f0c8;
+}
+
+td.task-cell.weekend .cell-btn.done {
+  background: #b3dfb3;
+}
+
 td.row-name {
   width: 124px;
   background: #f7f9f6;

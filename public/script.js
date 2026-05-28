@@ -362,11 +362,24 @@ function createExampleState() {
   }));
 
   const tasks = {};
+  // Lunes - Viernes
   putTask(tasks, collaborators[0].id, 1, "Freidora", "canastas", false);
   putTask(tasks, collaborators[1].id, 0, "Estufa", "hornillas", false);
   putTask(tasks, collaborators[2].id, 2, "Plancha", "mesa", false);
   putTask(tasks, collaborators[3].id, 3, "Freidora", "tuberia", true);
   putTask(tasks, collaborators[4].id, 2, "Grill", "malla", false);
+  // Sabado (dia 5)
+  putTask(tasks, collaborators[0].id, 5, "Zafacones", "todos-zafacones", false);
+  putTask(tasks, collaborators[1].id, 5, "Piso", "cepillado-desgrasante", false);
+  putTask(tasks, collaborators[2].id, 5, "Nevera 1", "limpieza-interior", false);
+  putTask(tasks, collaborators[3].id, 5, "Mesa de despacho", "mesa-despacho", false);
+  putTask(tasks, collaborators[4].id, 5, "Grill", "hornillas", false);
+  // Domingo (dia 6)
+  putTask(tasks, collaborators[0].id, 6, "Freidora", "limpieza-interior", false);
+  putTask(tasks, collaborators[1].id, 6, "Estufa", "interior", false);
+  putTask(tasks, collaborators[2].id, 6, "Nevera 2", "limpieza-exterior", false);
+  putTask(tasks, collaborators[3].id, 6, "Mesa de trabajo trasera", "limpieza-completa", false);
+  putTask(tasks, collaborators[4].id, 6, "Bano Maria", "cuerpo", false);
 
   return { collaborators, tasks };
 }
@@ -614,8 +627,9 @@ function renderTable() {
         ? `${meta.team} | ${meta.taskName} | ${meta.legend.label}`
         : "Sin tarea";
 
+      const weekendClass = dayIndex >= 5 ? "weekend" : "";
       return `
-        <td class="task-cell" data-day-label="${escapeHtml(DAYS[dayIndex])}">
+        <td class="task-cell ${weekendClass}" data-day-label="${escapeHtml(DAYS[dayIndex])}">
           <button
             type="button"
             class="cell-btn ${statusClass} ${selectedClass}"
