@@ -354,10 +354,10 @@ async function openPhotoModal(taskLabel) {
       setTimeout(() => reject(new Error("timeout")), 8000);
     });
     photoVideo.play();
-    photoStatusText.textContent = "Apunta la cámara a la tarea realizada y toma la foto.";
+    photoStatusText.textContent = "✓ Tarea marcada. Toma una foto como evidencia o presiona Omitir.";
     photoCaptureBtn.disabled    = false;
   } catch (_) {
-    photoStatusText.textContent = "No se pudo acceder a la cámara. Verifica los permisos del navegador.";
+    photoStatusText.textContent = "✓ Tarea marcada. No se pudo abrir la cámara — presiona Omitir para continuar.";
   }
 
   return new Promise((resolve) => { photoModalResolve = resolve; });
@@ -491,34 +491,49 @@ async function toggleTaskDone(index, done) {
   const cellData = state.tasks[key];
   if (!cellData || !Array.isArray(cellData.items) || !cellData.items[index]) return;
 
-  // Una vez marcada, la tarea no puede desmarcarse
+  // Una vez marcada, no puede desmarcarse
   if (!done && cellData.items[index].done) {
     const cb = modalTaskList.querySelector(`[data-toggle-done="${index}"]`);
     if (cb) cb.checked = true;
     return;
   }
 
-  if (done) {
-    const meta = resolveTaskMeta(cellData.items[index]);
-    const label = `${meta.taskName} · ${DAYS[selectedCell.dayIndex]}`;
-    const photoUrl = await openPhotoModal(label);
-    if (!photoUrl) {
-      const cb = modalTaskList.querySelector(`[data-toggle-done="${index}"]`);
-      if (cb) cb.checked = false;
-      return;
-    }
-    cellData.items[index].done             = true;
-    cellData.items[index].completedAt      = new Date().toISOString();
-    cellData.items[index].evidencePhotoUrl = photoUrl;
-  } else {
+  if (!done) {
     cellData.items[index].done = false;
     delete cellData.items[index].completedAt;
     delete cellData.items[index].evidencePhotoUrl;
+    saveState();
+    renderTable();
+    renderModalTaskList();
+    return;
   }
 
+  // ── Marcar como realizada INMEDIATAMENTE ──
+  const capturedCollabId = selectedCell.collaboratorId;
+  const capturedDayIndex = selectedCell.dayIndex;
+  cellData.items[index].done        = true;
+  cellData.items[index].completedAt = new Date().toISOString();
   saveState();
   renderTable();
   renderModalTaskList();
+
+  // ── Foto de evidencia (opcional, no bloquea el marcado) ──
+  const meta  = resolveTaskMeta(cellData.items[index]);
+  const label = `${meta.taskName} · ${DAYS[capturedDayIndex]}`;
+  const photoUrl = await openPhotoModal(label);
+
+  if (photoUrl) {
+    const k  = buildCellKey(capturedCollabId, capturedDayIndex);
+    const cd = state.tasks[k];
+    if (cd?.items?.[index]) {
+      cd.items[index].evidencePhotoUrl = photoUrl;
+      saveState();
+      if (selectedCell?.collaboratorId === capturedCollabId &&
+          selectedCell?.dayIndex === capturedDayIndex) {
+        renderModalTaskList();
+      }
+    }
+  }
 }
 
 function removeTask(index) {
