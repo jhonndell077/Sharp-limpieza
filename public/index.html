@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
   <header class="app-header">
@@ -47,27 +47,29 @@
     </section>
   </main>
 
-  <!-- Modal de reconocimiento facial -->
-  <div id="face-modal-overlay" class="modal-overlay face-modal-overlay hidden">
-    <div class="modal-card face-modal-card">
+  <!-- Modal de evidencia fotográfica -->
+  <div id="photo-modal-overlay" class="modal-overlay photo-modal-overlay hidden">
+    <div class="modal-card photo-modal-card">
       <div class="modal-head">
         <div>
-          <span class="modal-kicker" id="face-modal-kicker">Face ID</span>
-          <strong id="face-modal-label">-</strong>
+          <span class="modal-kicker">Evidencia de tarea</span>
+          <strong id="photo-modal-label">-</strong>
         </div>
-        <button type="button" id="face-modal-close-btn" class="modal-close-btn">✕</button>
+        <button type="button" id="photo-modal-close-btn" class="modal-close-btn">✕</button>
       </div>
-      <div class="face-modal-body">
-        <div class="camera-wrap">
-          <video id="face-video" autoplay muted playsinline></video>
-          <div class="face-guide-ring"></div>
-          <div id="face-msg" class="face-msg"></div>
+      <div class="photo-modal-body">
+        <div class="photo-camera-wrap">
+          <video id="photo-video" autoplay muted playsinline></video>
+          <canvas id="photo-canvas"></canvas>
+          <div id="photo-overlay-msg" class="photo-overlay-msg"></div>
         </div>
-        <p id="face-status-text" class="face-status-text"></p>
+        <p id="photo-status-text" class="photo-status-text">Iniciando cámara...</p>
       </div>
-      <div class="modal-foot">
-        <button type="button" id="face-action-btn" disabled>Capturar rostro</button>
-        <button type="button" id="face-cancel-btn" class="secondary">Cancelar</button>
+      <div class="modal-foot" id="photo-modal-foot">
+        <button type="button" id="photo-capture-btn" disabled>📷 Tomar foto</button>
+        <button type="button" id="photo-confirm-btn" style="display:none">✓ Confirmar</button>
+        <button type="button" id="photo-retake-btn" class="secondary" style="display:none">↩ Repetir</button>
+        <button type="button" id="photo-cancel-btn" class="secondary">Cancelar</button>
       </div>
     </div>
   </div>
@@ -119,6 +121,7 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=9"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+  <script src="script.js?v=10"></script>
 </body>
 </html>

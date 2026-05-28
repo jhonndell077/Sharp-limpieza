@@ -147,16 +147,18 @@ const modalCloseBtn     = document.getElementById("modal-close-btn");
 const modalCancelBtn    = document.getElementById("modal-cancel-btn");
 const modalTaskList     = document.getElementById("modal-task-list");
 
-// Face ID DOM refs
-const faceModalOverlay  = document.getElementById("face-modal-overlay");
-const faceModalKicker   = document.getElementById("face-modal-kicker");
-const faceModalLabel    = document.getElementById("face-modal-label");
-const faceModalCloseBtn = document.getElementById("face-modal-close-btn");
-const faceCancelBtn     = document.getElementById("face-cancel-btn");
-const faceActionBtn     = document.getElementById("face-action-btn");
-const faceVideo         = document.getElementById("face-video");
-const faceMsg           = document.getElementById("face-msg");
-const faceStatusText    = document.getElementById("face-status-text");
+// Photo evidence DOM refs
+const photoModalOverlay  = document.getElementById("photo-modal-overlay");
+const photoModalLabel    = document.getElementById("photo-modal-label");
+const photoModalCloseBtn = document.getElementById("photo-modal-close-btn");
+const photoCancelBtn     = document.getElementById("photo-cancel-btn");
+const photoCaptureBtn    = document.getElementById("photo-capture-btn");
+const photoConfirmBtn    = document.getElementById("photo-confirm-btn");
+const photoRetakeBtn     = document.getElementById("photo-retake-btn");
+const photoVideo         = document.getElementById("photo-video");
+const photoCanvas        = document.getElementById("photo-canvas");
+const photoOverlayMsg    = document.getElementById("photo-overlay-msg");
+const photoStatusText    = document.getElementById("photo-status-text");
 
 let state = loadState() || createInitialState();
 let selectedCell = null;
@@ -165,14 +167,10 @@ let remoteSaveTimer = null;
 let isApplyingRemoteState = false;
 let hasRemoteSnapshot = false;
 
-const FACE_MODELS_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model";
-const FACE_THRESHOLD  = 0.50;
-let faceModelsReady   = false;
-let faceModelsPromise = null;
-let faceStream        = null;
-let faceModalMode     = null;
-let faceModalCollabId = null;
-let faceModalResolve  = null;
+let firebaseStorage   = null;
+let photoStream       = null;
+let photoBlob         = null;
+let photoModalResolve = null;
 
 updateTeamSelectors();
 renderTable();
@@ -183,21 +181,18 @@ if (weekRangeEl) weekRangeEl.textContent = getCurrentWeekLabel();
 
 // ── Event listeners ──────────────────────────────────────────────────
 
-collaboratorForm.addEventListener("submit", async (event) => {
+collaboratorForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const name = collaboratorInput.value.trim();
   if (!name) { collaboratorInput.focus(); return; }
-  const newId = createId();
-  state.collaborators.push({ id: newId, name, faceDescriptor: null });
+  state.collaborators.push({ id: createId(), name });
   collaboratorInput.value = "";
   saveState();
   updateTeamSelectors();
   renderTable();
-  await openFaceModal("register", newId);
-  renderTable();
 });
 
-scheduleBody.addEventListener("click", async (event) => {
+scheduleBody.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
 
@@ -213,14 +208,6 @@ scheduleBody.addEventListener("click", async (event) => {
     }
     if (selectedCell && selectedCell.collaboratorId === cid) closeModal();
     saveState();
-    renderTable();
-    return;
-  }
-
-  const faceBtn = target.closest("[data-register-face]");
-  if (faceBtn) {
-    const cid = faceBtn.getAttribute("data-register-face");
-    await openFaceModal("register", cid);
     renderTable();
     return;
   }
@@ -341,158 +328,122 @@ function closeModal() {
   renderTable();
 }
 
-// ── Face ID (reconocimiento facial con cámara) ─────────────
+// ── Evidencia fotográfica ──────────────────────────────────
 
-async function loadFaceModels() {
-  if (faceModelsReady) return true;
-  if (faceModelsPromise) return faceModelsPromise;
-  faceModelsPromise = (async () => {
-    if (typeof faceapi === "undefined") {
-      const loaded = await new Promise((resolve) => {
-        const s = document.createElement("script");
-        s.src     = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js";
-        s.onload  = () => resolve(true);
-        s.onerror = () => resolve(false);
-        document.head.appendChild(s);
-      });
-      if (!loaded || typeof faceapi === "undefined") return false;
-    }
-    try {
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODELS_URL),
-        faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODELS_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS_URL)
-      ]);
-      faceModelsReady = true;
-      return true;
-    } catch (err) {
-      console.error("face models error", err);
-      faceModelsPromise = null;
-      return false;
-    }
-  })();
-  return faceModelsPromise;
-}
+async function openPhotoModal(taskLabel) {
+  photoBlob    = null;
+  photoCanvas.classList.remove("visible");
+  photoVideo.style.display      = "";
+  photoOverlayMsg.textContent   = "";
+  photoOverlayMsg.className     = "photo-overlay-msg";
+  photoModalLabel.textContent   = taskLabel;
+  photoStatusText.textContent   = "Iniciando cámara trasera...";
+  photoCaptureBtn.disabled      = true;
+  photoCaptureBtn.style.display = "";
+  photoConfirmBtn.style.display = "none";
+  photoRetakeBtn.style.display  = "none";
+  photoModalOverlay.classList.remove("hidden");
 
-async function openFaceModal(mode, collaboratorId) {
-  faceModalMode     = mode;
-  faceModalCollabId = collaboratorId;
-  const collaborator = state.collaborators.find((c) => c.id === collaboratorId);
-  if (!collaborator) return false;
-
-  faceModalKicker.textContent = mode === "register" ? "Registrar Face ID" : "Verificar identidad";
-  faceModalLabel.textContent  = collaborator.name;
-  faceActionBtn.textContent   = mode === "register" ? "Capturar rostro" : "Verificar";
-  faceActionBtn.disabled      = true;
-  faceMsg.textContent         = "";
-  faceMsg.className           = "face-msg";
-  faceStatusText.textContent  = "Iniciando cámara...";
-  faceModalOverlay.classList.remove("hidden");
-
-  // Arrancar cámara PRIMERO (el usuario se ve mientras cargan modelos)
   try {
-    faceStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
+    photoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 960 } }
     });
-    faceVideo.srcObject = faceStream;
+    photoVideo.srcObject = photoStream;
     await new Promise((resolve, reject) => {
-      faceVideo.onloadedmetadata = resolve;
+      photoVideo.onloadedmetadata = resolve;
       setTimeout(() => reject(new Error("timeout")), 8000);
     });
-    faceVideo.play();
+    photoVideo.play();
+    photoStatusText.textContent = "Apunta la cámara a la tarea realizada y toma la foto.";
+    photoCaptureBtn.disabled    = false;
   } catch (_) {
-    faceStatusText.textContent = "No se pudo acceder a la cámara. Verifica los permisos del navegador.";
-    return new Promise((resolve) => { faceModalResolve = resolve; });
+    photoStatusText.textContent = "No se pudo acceder a la cámara. Verifica los permisos del navegador.";
   }
 
-  // Cargar modelos mientras el usuario ya se ve en la cámara
-  faceStatusText.textContent = "Cargando modelos de IA... (primera vez puede tardar)";
-  const modelsOk = await loadFaceModels();
-  if (!modelsOk) {
-    faceStatusText.textContent = "Error al cargar los modelos. Verifica tu conexión e intenta de nuevo.";
-    return new Promise((resolve) => { faceModalResolve = resolve; });
-  }
-
-  faceStatusText.textContent = mode === "register"
-    ? "Centra tu rostro en el círculo y presiona Capturar rostro."
-    : "Centra tu rostro en el círculo y presiona Verificar.";
-  faceActionBtn.disabled = false;
-
-  return new Promise((resolve) => { faceModalResolve = resolve; });
+  return new Promise((resolve) => { photoModalResolve = resolve; });
 }
 
-faceActionBtn.addEventListener("click", async () => {
-  faceActionBtn.disabled = true;
-  faceMsg.textContent    = "Detectando rostro...";
-  faceMsg.className      = "face-msg";
+photoCaptureBtn.addEventListener("click", () => {
+  const w = 800;
+  const h = Math.round(w * (photoVideo.videoHeight / photoVideo.videoWidth)) || 600;
+  photoCanvas.width  = w;
+  photoCanvas.height = h;
+  photoCanvas.getContext("2d").drawImage(photoVideo, 0, 0, w, h);
 
-  let detection;
-  try {
-    detection = await faceapi
-      .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions({ inputSize: 320 }))
-      .withFaceLandmarks(true)
-      .withFaceDescriptor();
-  } catch (err) {
-    faceMsg.textContent    = "Error al detectar. Intenta de nuevo.";
-    faceMsg.className      = "face-msg error";
-    faceActionBtn.disabled = false;
-    return;
-  }
-
-  if (!detection) {
-    faceMsg.textContent        = "No se detectó ningún rostro.";
-    faceMsg.className          = "face-msg error";
-    faceStatusText.textContent = "Asegúrate de estar bien iluminado y centrado en el círculo.";
-    faceActionBtn.disabled     = false;
-    return;
-  }
-
-  const descriptor = Array.from(detection.descriptor);
-
-  if (faceModalMode === "register") {
-    const collaborator = state.collaborators.find((c) => c.id === faceModalCollabId);
-    if (collaborator) {
-      collaborator.faceDescriptor = descriptor;
-      saveState();
-    }
-    faceMsg.textContent        = "✓ Rostro registrado";
-    faceMsg.className          = "face-msg success";
-    faceStatusText.textContent = "Face ID guardado correctamente.";
-    setTimeout(() => closeFaceModal(true), 1200);
-  } else {
-    const collaborator = state.collaborators.find((c) => c.id === faceModalCollabId);
-    if (!collaborator || !Array.isArray(collaborator.faceDescriptor)) {
-      closeFaceModal(true);
-      return;
-    }
-    const distance = faceapi.euclideanDistance(descriptor, collaborator.faceDescriptor);
-    if (distance <= FACE_THRESHOLD) {
-      faceMsg.textContent        = "✓ Identidad verificada";
-      faceMsg.className          = "face-msg success";
-      faceStatusText.textContent = "Confirmado. Tarea marcada como realizada.";
-      setTimeout(() => closeFaceModal(true), 900);
-    } else {
-      faceMsg.textContent        = "✗ Rostro no reconocido";
-      faceMsg.className          = "face-msg error";
-      faceStatusText.textContent = "No coincide con el rostro registrado. Intenta de nuevo.";
-      faceActionBtn.disabled     = false;
-    }
-  }
+  photoCanvas.toBlob((blob) => {
+    photoBlob = blob;
+    photoCanvas.classList.add("visible");
+    photoVideo.style.display      = "none";
+    photoOverlayMsg.textContent   = "¿Usar esta foto?";
+    photoOverlayMsg.className     = "photo-overlay-msg";
+    photoStatusText.textContent   = "Confirma la foto o tómala de nuevo.";
+    photoCaptureBtn.style.display = "none";
+    photoConfirmBtn.style.display = "";
+    photoRetakeBtn.style.display  = "";
+    photoConfirmBtn.disabled      = false;
+    photoRetakeBtn.disabled       = false;
+  }, "image/jpeg", 0.80);
 });
 
-faceModalCloseBtn.addEventListener("click", () => closeFaceModal(false));
-faceCancelBtn.addEventListener("click",     () => closeFaceModal(false));
+photoRetakeBtn.addEventListener("click", () => {
+  photoBlob    = null;
+  photoCanvas.classList.remove("visible");
+  photoVideo.style.display      = "";
+  photoOverlayMsg.textContent   = "";
+  photoStatusText.textContent   = "Apunta la cámara a la tarea realizada y toma la foto.";
+  photoCaptureBtn.style.display = "";
+  photoConfirmBtn.style.display = "none";
+  photoRetakeBtn.style.display  = "none";
+});
 
-function closeFaceModal(success) {
-  if (faceStream) {
-    faceStream.getTracks().forEach((t) => t.stop());
-    faceStream = null;
+photoConfirmBtn.addEventListener("click", async () => {
+  if (!photoBlob) return;
+  photoConfirmBtn.disabled    = true;
+  photoRetakeBtn.disabled     = true;
+  photoStatusText.textContent = "Subiendo foto...";
+
+  let photoUrl = null;
+
+  if (firebaseStorage && selectedCell) {
+    try {
+      const path = `task-evidence/${selectedCell.collaboratorId}/${buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex)}/${Date.now()}.jpg`;
+      const ref = firebaseStorage.ref(path);
+      await ref.put(photoBlob, { contentType: "image/jpeg" });
+      photoUrl = await ref.getDownloadURL();
+    } catch (err) {
+      console.warn("Firebase Storage upload failed, using base64 fallback:", err.message);
+    }
   }
-  faceVideo.srcObject = null;
-  faceModalOverlay.classList.add("hidden");
-  if (faceModalResolve) {
-    faceModalResolve(success);
-    faceModalResolve = null;
+
+  if (!photoUrl) {
+    photoUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(photoBlob);
+    });
+  }
+
+  photoOverlayMsg.textContent = "✓ Foto guardada";
+  photoOverlayMsg.className   = "photo-overlay-msg success";
+  photoStatusText.textContent = "Tarea marcada como realizada con evidencia fotográfica.";
+  setTimeout(() => closePhotoModal(photoUrl), 800);
+});
+
+photoModalCloseBtn.addEventListener("click", () => closePhotoModal(null));
+photoCancelBtn.addEventListener("click",     () => closePhotoModal(null));
+
+function closePhotoModal(photoUrl) {
+  if (photoStream) {
+    photoStream.getTracks().forEach((t) => t.stop());
+    photoStream = null;
+  }
+  photoVideo.srcObject = null;
+  photoCanvas.classList.remove("visible");
+  photoVideo.style.display = "";
+  photoModalOverlay.classList.add("hidden");
+  if (photoModalResolve) {
+    photoModalResolve(photoUrl);
+    photoModalResolve = null;
   }
 }
 
@@ -511,12 +462,18 @@ function renderModalTaskList() {
   modalTaskList.innerHTML = items.map((item, index) => {
     const meta = resolveTaskMeta(item);
     const doneClass = item.done ? "done" : "";
+    const thumbHtml = item.done && item.evidencePhotoUrl
+      ? `<a href="${escapeHtml(item.evidencePhotoUrl)}" target="_blank" rel="noopener" title="Ver evidencia fotográfica">
+           <img src="${escapeHtml(item.evidencePhotoUrl)}" class="task-evidence-thumb" alt="Evidencia" loading="lazy">
+         </a>`
+      : "";
     return `
       <div class="modal-task-item ${doneClass}">
         <label class="modal-task-check">
           <input type="checkbox" ${item.done ? "checked" : ""} data-toggle-done="${index}">
           <span>${meta.legend.symbol} <strong>${escapeHtml(meta.taskName)}</strong> — ${escapeHtml(meta.team)}</span>
         </label>
+        ${thumbHtml}
         <button type="button" class="modal-task-remove" data-remove-task="${index}" title="Eliminar">✕</button>
       </div>
     `;
@@ -526,22 +483,28 @@ function renderModalTaskList() {
 async function toggleTaskDone(index, done) {
   if (!selectedCell) return;
 
-  if (done) {
-    const collaborator = state.collaborators.find((c) => c.id === selectedCell.collaboratorId);
-    if (collaborator && Array.isArray(collaborator.faceDescriptor)) {
-      const verified = await openFaceModal("verify", selectedCell.collaboratorId);
-      if (!verified) {
-        const cb = modalTaskList.querySelector(`[data-toggle-done="${index}"]`);
-        if (cb) cb.checked = false;
-        return;
-      }
-    }
-  }
-
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
   const cellData = state.tasks[key];
   if (!cellData || !Array.isArray(cellData.items) || !cellData.items[index]) return;
-  cellData.items[index].done = done;
+
+  if (done) {
+    const meta = resolveTaskMeta(cellData.items[index]);
+    const label = `${meta.taskName} · ${DAYS[selectedCell.dayIndex]}`;
+    const photoUrl = await openPhotoModal(label);
+    if (!photoUrl) {
+      const cb = modalTaskList.querySelector(`[data-toggle-done="${index}"]`);
+      if (cb) cb.checked = false;
+      return;
+    }
+    cellData.items[index].done             = true;
+    cellData.items[index].completedAt      = new Date().toISOString();
+    cellData.items[index].evidencePhotoUrl = photoUrl;
+  } else {
+    cellData.items[index].done = false;
+    delete cellData.items[index].completedAt;
+    delete cellData.items[index].evidencePhotoUrl;
+  }
+
   saveState();
   renderTable();
   renderModalTaskList();
@@ -641,11 +604,7 @@ function normalizeState(parsed) {
 
   const collaborators = parsed.collaborators
     .filter((c) => c && typeof c.id === "string" && typeof c.name === "string")
-    .map((c) => ({
-      id: c.id,
-      name: c.name.trim(),
-      faceDescriptor: Array.isArray(c.faceDescriptor) ? c.faceDescriptor : null
-    }))
+    .map((c) => ({ id: c.id, name: c.name.trim() }))
     .filter((c) => c.name.length > 0);
 
   const sourceTasks = parsed.tasks && typeof parsed.tasks === "object" ? parsed.tasks : {};
@@ -688,8 +647,12 @@ function normalizeTaskItem(value) {
 
   if (!taskId && team && text) taskId = findTaskIdByText(team, text);
 
-  if (taskId && findTask(team, taskId)) return { id, team, taskId, done };
-  if (text) return { id, team, taskId: "", text, colorKey: LEGEND[colorKey] ? colorKey : "none", done };
+  const completedAt      = typeof value.completedAt === "string" ? value.completedAt : undefined;
+  const evidencePhotoUrl = typeof value.evidencePhotoUrl === "string" ? value.evidencePhotoUrl : undefined;
+  const extra = { ...(completedAt ? { completedAt } : {}), ...(evidencePhotoUrl ? { evidencePhotoUrl } : {}) };
+
+  if (taskId && findTask(team, taskId)) return { id, team, taskId, done, ...extra };
+  if (text) return { id, team, taskId: "", text, colorKey: LEGEND[colorKey] ? colorKey : "none", done, ...extra };
   return null;
 }
 
@@ -704,6 +667,11 @@ function initRemoteSync() {
     const app = firebase.apps && firebase.apps.length > 0 ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
     const database = firebase.database(app);
     remoteBoardRef = database.ref(REMOTE_BOARD_PATH);
+
+    if (typeof firebase.storage === "function") {
+      try { firebaseStorage = firebase.storage(app); } catch (_) {}
+    }
+
     setSyncStatus("Conectando...", "busy");
 
     database.ref(".info/connected").on("value", (snap) => {
@@ -838,11 +806,6 @@ function renderTable() {
         <td class="row-name">
           <div class="name-wrap">
             <span>${escapeHtml(collaborator.name)}</span>
-            <button type="button"
-              class="face-id-btn ${collaborator.faceDescriptor ? 'face-registered' : ''}"
-              data-register-face="${collaborator.id}"
-              title="${collaborator.faceDescriptor ? 'Face ID activo — clic para actualizar' : 'Registrar Face ID'}"
-              aria-label="Face ID ${escapeHtml(collaborator.name)}">${collaborator.faceDescriptor ? '🔐' : '📷'}</button>
             <button type="button" class="remove-btn"
               data-remove-collaborator="${collaborator.id}"
               title="Eliminar colaborador"
