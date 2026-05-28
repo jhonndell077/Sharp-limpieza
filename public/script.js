@@ -165,14 +165,14 @@ let remoteSaveTimer = null;
 let isApplyingRemoteState = false;
 let hasRemoteSnapshot = false;
 
-const FACE_MODELS_URL  = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
-const FACE_THRESHOLD   = 0.50;
-let faceModelsReady    = false;
-let faceModelsPromise  = null;
-let faceStream         = null;
-let faceModalMode      = null;
-let faceModalCollabId  = null;
-let faceModalResolve   = null;
+const FACE_MODELS_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
+const FACE_THRESHOLD  = 0.50;
+let faceModelsReady   = false;
+let faceModelsPromise = null;
+let faceStream        = null;
+let faceModalMode     = null;
+let faceModalCollabId = null;
+let faceModalResolve  = null;
 
 updateTeamSelectors();
 renderTable();
@@ -341,7 +341,7 @@ function closeModal() {
   renderTable();
 }
 
-// ── Face ID ────────────────────────────────────────────────
+// ── Face ID (reconocimiento facial con cámara) ─────────────
 
 async function loadFaceModels() {
   if (faceModelsReady) return true;
@@ -350,7 +350,7 @@ async function loadFaceModels() {
     if (typeof faceapi === "undefined") {
       const loaded = await new Promise((resolve) => {
         const s = document.createElement("script");
-        s.src = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
+        s.src     = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
         s.onload  = () => resolve(true);
         s.onerror = () => resolve(false);
         document.head.appendChild(s);
@@ -380,7 +380,7 @@ async function openFaceModal(mode, collaboratorId) {
   const collaborator = state.collaborators.find((c) => c.id === collaboratorId);
   if (!collaborator) return false;
 
-  faceModalKicker.textContent = mode === "register" ? "Registro de Face ID" : "Verificación de identidad";
+  faceModalKicker.textContent = mode === "register" ? "Registrar Face ID" : "Verificar identidad";
   faceModalLabel.textContent  = collaborator.name;
   faceActionBtn.textContent   = mode === "register" ? "Capturar rostro" : "Verificar";
   faceActionBtn.disabled      = true;
@@ -391,17 +391,19 @@ async function openFaceModal(mode, collaboratorId) {
 
   const modelsOk = await loadFaceModels();
   if (!modelsOk) {
-    faceStatusText.textContent = "Error al cargar los modelos de IA. Verifica tu conexión.";
+    faceStatusText.textContent = "Error al cargar los modelos. Verifica tu conexión.";
     return new Promise((resolve) => { faceModalResolve = resolve; });
   }
 
   faceStatusText.textContent = "Activando cámara...";
   try {
-    faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+    faceStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
+    });
     faceVideo.srcObject = faceStream;
     await new Promise((resolve, reject) => {
       faceVideo.onloadedmetadata = resolve;
-      setTimeout(reject, 8000);
+      setTimeout(() => reject(new Error("timeout")), 8000);
     });
     faceVideo.play();
   } catch (_) {
@@ -410,8 +412,8 @@ async function openFaceModal(mode, collaboratorId) {
   }
 
   faceStatusText.textContent = mode === "register"
-    ? "Coloca tu rostro frente a la cámara y presiona Capturar rostro."
-    : "Coloca tu rostro frente a la cámara y presiona Verificar.";
+    ? "Centra tu rostro en el círculo y presiona Capturar rostro."
+    : "Centra tu rostro en el círculo y presiona Verificar.";
   faceActionBtn.disabled = false;
 
   return new Promise((resolve) => { faceModalResolve = resolve; });
@@ -419,7 +421,7 @@ async function openFaceModal(mode, collaboratorId) {
 
 faceActionBtn.addEventListener("click", async () => {
   faceActionBtn.disabled = true;
-  faceMsg.textContent    = "Detectando...";
+  faceMsg.textContent    = "Detectando rostro...";
   faceMsg.className      = "face-msg";
 
   let detection;
@@ -429,8 +431,8 @@ faceActionBtn.addEventListener("click", async () => {
       .withFaceLandmarks(true)
       .withFaceDescriptor();
   } catch (err) {
-    faceMsg.textContent   = "Error al detectar. Intenta de nuevo.";
-    faceMsg.className     = "face-msg error";
+    faceMsg.textContent    = "Error al detectar. Intenta de nuevo.";
+    faceMsg.className      = "face-msg error";
     faceActionBtn.disabled = false;
     return;
   }
@@ -438,7 +440,7 @@ faceActionBtn.addEventListener("click", async () => {
   if (!detection) {
     faceMsg.textContent        = "No se detectó ningún rostro.";
     faceMsg.className          = "face-msg error";
-    faceStatusText.textContent = "Asegúrate de que tu rostro esté bien iluminado y centrado.";
+    faceStatusText.textContent = "Asegúrate de estar bien iluminado y centrado en el círculo.";
     faceActionBtn.disabled     = false;
     return;
   }
@@ -454,7 +456,7 @@ faceActionBtn.addEventListener("click", async () => {
     faceMsg.textContent        = "✓ Rostro registrado";
     faceMsg.className          = "face-msg success";
     faceStatusText.textContent = "Face ID guardado correctamente.";
-    setTimeout(() => closeFaceModal(true), 1100);
+    setTimeout(() => closeFaceModal(true), 1200);
   } else {
     const collaborator = state.collaborators.find((c) => c.id === faceModalCollabId);
     if (!collaborator || !Array.isArray(collaborator.faceDescriptor)) {
@@ -465,12 +467,12 @@ faceActionBtn.addEventListener("click", async () => {
     if (distance <= FACE_THRESHOLD) {
       faceMsg.textContent        = "✓ Identidad verificada";
       faceMsg.className          = "face-msg success";
-      faceStatusText.textContent = "Coincidencia confirmada.";
+      faceStatusText.textContent = "Confirmado. Tarea marcada como realizada.";
       setTimeout(() => closeFaceModal(true), 900);
     } else {
       faceMsg.textContent        = "✗ Rostro no reconocido";
       faceMsg.className          = "face-msg error";
-      faceStatusText.textContent = "El rostro no coincide con el registrado. Intenta de nuevo.";
+      faceStatusText.textContent = "No coincide con el rostro registrado. Intenta de nuevo.";
       faceActionBtn.disabled     = false;
     }
   }
