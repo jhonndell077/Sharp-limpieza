@@ -136,13 +136,236 @@ button.secondary { background: #7d8678; }
 
 /* ── Week range ──────────────────────────────────────────── */
 
-.week-range-title {
+/* ── Header top row ─────────────────────────────────────── */
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.header-left { flex: 1; min-width: 0; }
+
+.realizadas-open-btn {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1.5px solid rgba(255,255,255,0.4);
+  font-size: 0.85rem;
+  padding: 0.45rem 0.85rem;
+  min-height: 40px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.realizadas-open-btn:hover { background: rgba(255,255,255,0.3); filter: none; }
+
+/* ── Week navigation ─────────────────────────────────────── */
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   margin: 0.4rem 0 0.6rem;
+}
+
+.week-nav-btn {
+  background: transparent;
+  color: #2e4529;
+  border: 1.5px solid #b2c4ad;
+  border-radius: 6px;
+  min-height: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.week-nav-btn:hover { background: #e8f0e4; filter: none; }
+
+.week-range-title {
+  margin: 0;
+  flex: 1;
+  max-width: 300px;
   font-size: clamp(0.82rem, 2.2vw, 0.97rem);
   font-weight: 700;
   color: #2e4529;
   text-align: center;
   letter-spacing: 0.02em;
+}
+
+/* ── Realizadas panel ────────────────────────────────────── */
+
+.realizadas-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+}
+
+.realizadas-panel.hidden { display: none; }
+
+.realizadas-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.42);
+}
+
+.realizadas-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 100vw);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.18);
+  animation: drawer-in 0.22s ease;
+}
+
+@keyframes drawer-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+.realizadas-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: linear-gradient(120deg, #6aa84f, #4e8137);
+  color: #fff;
+  flex-shrink: 0;
+  gap: 0.75rem;
+}
+
+.realizadas-head-left { flex: 1; min-width: 0; }
+.realizadas-head strong { font-size: 1rem; display: block; }
+
+.realizadas-week-label {
+  font-size: 0.75rem;
+  opacity: 0.85;
+  display: block;
+  margin-top: 0.1rem;
+}
+
+.realizadas-close-btn {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 0;
+  border-radius: 7px;
+  min-height: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.realizadas-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overscroll-behavior: contain;
+}
+
+.realizadas-empty {
+  margin: 2rem auto;
+  text-align: center;
+  color: #8a9887;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.realizadas-group {
+  border: 1px solid #d4e0cf;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.realizadas-collab-name {
+  background: #f0f5ee;
+  border-bottom: 1px solid #d4e0cf;
+  padding: 0.5rem 0.75rem;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #2a4226;
+}
+
+.realizadas-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #e8eee5;
+}
+
+.realizadas-row:last-child { border-bottom: 0; }
+
+.realizadas-row-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.realizadas-day {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #6aa84f;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.realizadas-task {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #182116;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.realizadas-time {
+  font-size: 0.7rem;
+  color: #7a8677;
+}
+
+.realizadas-thumb {
+  width: 56px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1.5px solid #8bcb8b;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: block;
+}
+
+.realizadas-no-photo {
+  font-size: 0.68rem;
+  color: #b0b8ab;
+  text-align: center;
+  width: 56px;
+  flex-shrink: 0;
 }
 
 /* ── Table — desktop ─────────────────────────────────────── */

@@ -147,6 +147,18 @@ const modalCloseBtn     = document.getElementById("modal-close-btn");
 const modalCancelBtn    = document.getElementById("modal-cancel-btn");
 const modalTaskList     = document.getElementById("modal-task-list");
 
+// Week nav DOM refs
+const weekPrevBtn = document.getElementById("week-prev-btn");
+const weekNextBtn = document.getElementById("week-next-btn");
+
+// Realizadas panel DOM refs
+const realizadasPanel    = document.getElementById("realizadas-panel");
+const realizadasBtn      = document.getElementById("realizadas-btn");
+const realizadasCloseBtn = document.getElementById("realizadas-close-btn");
+const realizadasBackdrop = realizadasPanel.querySelector(".realizadas-backdrop");
+const realizadasBody     = document.getElementById("realizadas-body");
+const realizadasWeekLbl  = document.getElementById("realizadas-week-label");
+
 // Photo evidence DOM refs
 const photoModalOverlay  = document.getElementById("photo-modal-overlay");
 const photoModalLabel    = document.getElementById("photo-modal-label");
@@ -159,6 +171,9 @@ const photoVideo         = document.getElementById("photo-video");
 const photoCanvas        = document.getElementById("photo-canvas");
 const photoOverlayMsg    = document.getElementById("photo-overlay-msg");
 const photoStatusText    = document.getElementById("photo-status-text");
+
+let currentWeekStart  = getActiveWeekMondayStr();
+let isOnAutoWeek      = true;
 
 let state = loadState() || createInitialState();
 let selectedCell = null;
@@ -174,10 +189,19 @@ let photoModalResolve = null;
 
 updateTeamSelectors();
 renderTable();
+renderWeekLabel();
 initRemoteSync();
 
-const weekRangeEl = document.getElementById("week-range");
-if (weekRangeEl) weekRangeEl.textContent = getCurrentWeekLabel();
+// Auto-rollover: check every 60 s if we need to advance the week
+setInterval(() => {
+  if (!isOnAutoWeek) return;
+  const auto = getActiveWeekMondayStr();
+  if (auto !== currentWeekStart) {
+    currentWeekStart = auto;
+    renderWeekLabel();
+    renderTable();
+  }
+}, 60_000);
 
 // ── Event listeners ──────────────────────────────────────────────────
 
@@ -204,7 +228,7 @@ scheduleBody.addEventListener("click", (event) => {
     if (!window.confirm(`Eliminar a ${collaborator.name} del calendario?`)) return;
     state.collaborators = state.collaborators.filter((c) => c.id !== cid);
     for (const key of Object.keys(state.tasks)) {
-      if (key.startsWith(`${cid}__`)) delete state.tasks[key];
+      if (key.startsWith(`${cid}__`) || key.includes(`__${cid}__`)) delete state.tasks[key];
     }
     if (selectedCell && selectedCell.collaboratorId === cid) closeModal();
     saveState();
@@ -299,6 +323,18 @@ modalCancelBtn.addEventListener("click", closeModal);
 modalOverlay.addEventListener("click", (event) => {
   if (event.target === modalOverlay) closeModal();
 });
+
+// Week navigation
+weekPrevBtn.addEventListener("click", () => navigateWeek(-1));
+weekNextBtn.addEventListener("click", () => navigateWeek(1));
+
+// Realizadas panel
+realizadasBtn.addEventListener("click", () => {
+  renderRealizadasPanel();
+  realizadasPanel.classList.remove("hidden");
+});
+realizadasCloseBtn.addEventListener("click", () => realizadasPanel.classList.add("hidden"));
+realizadasBackdrop.addEventListener("click", () => realizadasPanel.classList.add("hidden"));
 
 // ── Modal ─────────────────────────────────────────────────────────────
 
@@ -406,21 +442,30 @@ photoConfirmBtn.addEventListener("click", async () => {
 
   if (firebaseStorage && selectedCell) {
     try {
-      const path = `task-evidence/${selectedCell.collaboratorId}/${buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex)}/${Date.now()}.jpg`;
-      const ref = firebaseStorage.ref(path);
-      await ref.put(photoBlob, { contentType: "image/jpeg" });
-      photoUrl = await ref.getDownloadURL();
+      const path = `task-evidence/${selectedCell.collaboratorId}/${Date.now()}.jpg`;
+      const ref  = firebaseStorage.ref(path);
+      const uploadAndGet = async () => {
+        await ref.put(photoBlob, { contentType: "image/jpeg" });
+        return ref.getDownloadURL();
+      };
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("upload timeout")), 8000)
+      );
+      photoUrl = await Promise.race([uploadAndGet(), timeout]);
     } catch (err) {
-      console.warn("Firebase Storage upload failed, using base64 fallback:", err.message);
+      console.warn("Storage upload failed/timed out, using base64 fallback:", err.message);
     }
   }
 
   if (!photoUrl) {
-    photoUrl = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(photoBlob);
-    });
+    // Compress: resize to 480 px wide, quality 0.65
+    const tmp = document.createElement("canvas");
+    const w   = Math.min(480, photoCanvas.width);
+    const h   = Math.round(w * photoCanvas.height / (photoCanvas.width || 1));
+    tmp.width  = w;
+    tmp.height = h;
+    tmp.getContext("2d").drawImage(photoCanvas, 0, 0, w, h);
+    photoUrl = tmp.toDataURL("image/jpeg", 0.65);
   }
 
   photoOverlayMsg.textContent = "✓ Foto guardada";
@@ -635,28 +680,33 @@ function normalizeState(parsed) {
 
   const sourceTasks = parsed.tasks && typeof parsed.tasks === "object" ? parsed.tasks : {};
   const tasks = {};
+  const activeWeek = getActiveWeekMondayStr();
 
   for (const [key, value] of Object.entries(sourceTasks)) {
     if (!value || typeof value !== "object") continue;
 
+    // Detect key format: old = "collabId__dayIndex" (2 parts), new = "week__collabId__dayIndex" (3 parts)
+    const parts = key.split("__");
+    const targetKey = parts.length === 2 ? `${activeWeek}__${key}` : key;
+
     // Formato nuevo: tiene array items
     if (Array.isArray(value.items)) {
       if (value.free) {
-        tasks[key] = { free: true, items: [] };
+        tasks[targetKey] = { free: true, items: [] };
       } else {
         const items = value.items.map(normalizeTaskItem).filter(Boolean);
-        if (items.length > 0) tasks[key] = { free: false, items };
+        if (items.length > 0) tasks[targetKey] = { free: false, items };
       }
       continue;
     }
 
     // Formato antiguo: { free } o { team, taskId, done }
     if (value.free) {
-      tasks[key] = { free: true, items: [] };
+      tasks[targetKey] = { free: true, items: [] };
       continue;
     }
     const item = normalizeTaskItem(value);
-    if (item) tasks[key] = { free: false, items: [item] };
+    if (item) tasks[targetKey] = { free: false, items: [item] };
   }
 
   return { collaborators, tasks };
@@ -926,7 +976,7 @@ function buildTaskIndex() {
 }
 
 function buildCellKey(collaboratorId, dayIndex) {
-  return `${collaboratorId}__${dayIndex}`;
+  return `${currentWeekStart}__${collaboratorId}__${dayIndex}`;
 }
 
 function trimText(value, maxLength) {
@@ -939,13 +989,42 @@ function createId() {
     : `id_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 }
 
-function getCurrentWeekLabel() {
-  const now = new Date();
-  const day = now.getDay();
+// Returns "YYYY-MM-DD" of the active week's Monday.
+// If today is Sunday at or after 05:00, the active week is next week.
+function getActiveWeekMondayStr() {
+  const now  = new Date();
+  const day  = now.getDay(); // 0 = Sunday
+  const isLateNightSunday = day === 0 && now.getHours() >= 5;
   const diffToMonday = day === 0 ? -6 : 1 - day;
   const monday = new Date(now);
-  monday.setDate(now.getDate() + diffToMonday);
+  monday.setDate(now.getDate() + diffToMonday + (isLateNightSunday ? 7 : 0));
   monday.setHours(0, 0, 0, 0);
+  return mondayToStr(monday);
+}
+
+function mondayToStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function strToMonday(str) {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function navigateWeek(delta) {
+  const monday = strToMonday(currentWeekStart);
+  monday.setDate(monday.getDate() + delta * 7);
+  currentWeekStart = mondayToStr(monday);
+  isOnAutoWeek = currentWeekStart === getActiveWeekMondayStr();
+  renderWeekLabel();
+  renderTable();
+}
+
+function renderWeekLabel() {
+  const monday = strToMonday(currentWeekStart);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
   const fmt = (d) => {
@@ -954,7 +1033,68 @@ function getCurrentWeekLabel() {
     const yy = String(d.getFullYear()).slice(-2);
     return `${dd}/${mm}/${yy}`;
   };
-  return `Del ${fmt(monday)} Hasta ${fmt(sunday)}`;
+  const el = document.getElementById("week-range");
+  if (el) el.textContent = `Del ${fmt(monday)} Hasta ${fmt(sunday)}`;
+}
+
+function renderRealizadasPanel() {
+  const monday = strToMonday(currentWeekStart);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = (d) => {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${dd}/${mm}/${yy}`;
+  };
+  if (realizadasWeekLbl) realizadasWeekLbl.textContent = `${fmt(monday)} – ${fmt(sunday)}`;
+
+  const groups = [];
+  for (const collab of state.collaborators) {
+    const doneTasks = [];
+    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+      const key = buildCellKey(collab.id, dayIndex);
+      const cellData = state.tasks[key];
+      if (!cellData || !Array.isArray(cellData.items)) continue;
+      for (const item of cellData.items) {
+        if (!item.done) continue;
+        doneTasks.push({ item, dayIndex, meta: resolveTaskMeta(item) });
+      }
+    }
+    if (doneTasks.length > 0) groups.push({ collab, doneTasks });
+  }
+
+  if (groups.length === 0) {
+    realizadasBody.innerHTML = '<p class="realizadas-empty">No hay tareas realizadas esta semana.</p>';
+    return;
+  }
+
+  realizadasBody.innerHTML = groups.map(({ collab, doneTasks }) => {
+    const rows = doneTasks.map(({ item, dayIndex, meta }) => {
+      const timeStr = item.completedAt
+        ? new Date(item.completedAt).toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" })
+        : "";
+      const thumbHtml = item.evidencePhotoUrl
+        ? `<a href="${escapeHtml(item.evidencePhotoUrl)}" target="_blank" rel="noopener">
+             <img src="${escapeHtml(item.evidencePhotoUrl)}" class="realizadas-thumb" alt="Evidencia" loading="lazy">
+           </a>`
+        : `<span class="realizadas-no-photo">Sin foto</span>`;
+      return `
+        <div class="realizadas-row">
+          <div class="realizadas-row-info">
+            <span class="realizadas-day">${escapeHtml(DAYS[dayIndex])}</span>
+            <span class="realizadas-task">${meta.legend.symbol} ${escapeHtml(meta.taskName)} &middot; ${escapeHtml(meta.team)}</span>
+            ${timeStr ? `<span class="realizadas-time">${escapeHtml(timeStr)}</span>` : ""}
+          </div>
+          ${thumbHtml}
+        </div>`;
+    }).join("");
+    return `
+      <div class="realizadas-group">
+        <div class="realizadas-collab-name">${escapeHtml(collab.name)}</div>
+        ${rows}
+      </div>`;
+  }).join("");
 }
 
 function escapeHtml(value) {

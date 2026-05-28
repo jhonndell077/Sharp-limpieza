@@ -4,13 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
   <header class="app-header">
-    <h1>Sharp de Limpieza</h1>
-    <p>Calendario de ejecucion diaria con control de pendientes y realizadas.</p>
-    <span id="sync-status" class="sync-status" data-state="busy">Conectando...</span>
+    <div class="header-top">
+      <div class="header-left">
+        <h1>Sharp de Limpieza</h1>
+        <p>Calendario de ejecucion diaria con control de pendientes y realizadas.</p>
+        <span id="sync-status" class="sync-status" data-state="busy">Conectando...</span>
+      </div>
+      <button type="button" id="realizadas-btn" class="realizadas-open-btn">📋 Realizadas</button>
+    </div>
   </header>
 
   <main class="layout">
@@ -25,7 +30,11 @@
         </form>
       </div>
 
-      <h2 id="week-range" class="week-range-title"></h2>
+      <div class="week-nav">
+        <button type="button" id="week-prev-btn" class="week-nav-btn" title="Semana anterior">&#8249;</button>
+        <h2 id="week-range" class="week-range-title"></h2>
+        <button type="button" id="week-next-btn" class="week-nav-btn" title="Semana siguiente">&#8250;</button>
+      </div>
 
       <div class="table-wrap">
         <table id="schedule-table">
@@ -46,6 +55,21 @@
       </div>
     </section>
   </main>
+
+  <!-- Panel lateral: Realizadas -->
+  <div id="realizadas-panel" class="realizadas-panel hidden">
+    <div class="realizadas-backdrop"></div>
+    <div class="realizadas-drawer">
+      <div class="realizadas-head">
+        <div class="realizadas-head-left">
+          <strong>📋 Realizadas</strong>
+          <span id="realizadas-week-label" class="realizadas-week-label"></span>
+        </div>
+        <button type="button" id="realizadas-close-btn" class="realizadas-close-btn">✕</button>
+      </div>
+      <div id="realizadas-body" class="realizadas-body"></div>
+    </div>
+  </div>
 
   <!-- Modal de evidencia fotográfica -->
   <div id="photo-modal-overlay" class="modal-overlay photo-modal-overlay hidden">
@@ -122,6 +146,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
-  <script src="script.js?v=10"></script>
+  <script src="script.js?v=11"></script>
 </body>
 </html>
