@@ -1,6 +1,18 @@
 const DAYS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes"];
 const STORAGE_KEY = "sharp_limpieza_board_v2";
 const LEGACY_STORAGE_KEY = "sharp_limpieza_board_v1";
+const REMOTE_BOARD_PATH = "boards/main";
+const SYNC_DEBOUNCE_MS = 250;
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDvx6sjsvCEOiKQT6fbyx1SF7wuogZfOHI",
+  authDomain: "sharplimpieza.firebaseapp.com",
+  databaseURL: "https://sharplimpieza-default-rtdb.firebaseio.com",
+  projectId: "sharplimpieza",
+  storageBucket: "sharplimpieza.firebasestorage.app",
+  messagingSenderId: "1066646996136",
+  appId: "1:1066646996136:web:3f61f9101486b6d1a9ee9d"
+};
 
 const LEGEND = {
   red: {
@@ -168,12 +180,18 @@ const teamFilter = document.getElementById("team-filter");
 const clearTaskButton = document.getElementById("clear-task");
 const loadExampleButton = document.getElementById("load-example");
 const legendList = document.getElementById("legend-list");
+const syncStatus = document.getElementById("sync-status");
 
 let state = loadState() || createExampleState();
 let selectedCell = null;
+let remoteBoardRef = null;
+let remoteSaveTimer = null;
+let isApplyingRemoteState = false;
+let hasRemoteSnapshot = false;
 
 clearEditor();
 renderAll();
+initRemoteSync();
 
 teamFilter.addEventListener("change", () => {
   renderSummary();
@@ -364,66 +382,172 @@ function loadState() {
       return null;
     }
 
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.collaborators) || !parsed.tasks || typeof parsed.tasks !== "object") {
-      return null;
-    }
-
-    const collaborators = parsed.collaborators
-      .filter((item) => item && typeof item.id === "string" && typeof item.name === "string")
-      .map((item) => ({ id: item.id, name: item.name.trim() }))
-      .filter((item) => item.name.length > 0);
-
-    const tasks = {};
-    for (const [key, value] of Object.entries(parsed.tasks)) {
-      if (!value || typeof value !== "object") {
-        continue;
-      }
-
-      const done = Boolean(value.done);
-      const free = Boolean(value.free);
-      const team = typeof value.team === "string" ? value.team.trim() : "";
-      let taskId = typeof value.taskId === "string" ? value.taskId.trim() : "";
-      const text = typeof value.text === "string" ? value.text.trim() : "";
-      const colorKey = typeof value.colorKey === "string" ? value.colorKey.trim() : "";
-
-      if (free || normalizeText(text) === "free") {
-        tasks[key] = { free: true };
-        continue;
-      }
-
-      if (!taskId && team && text) {
-        taskId = findTaskIdByText(team, text);
-      }
-
-      const normalized = { done };
-      if (team) {
-        normalized.team = team;
-      }
-      if (taskId && findTask(team, taskId)) {
-        normalized.taskId = taskId;
-      } else if (text) {
-        if (taskId) {
-          normalized.taskId = "";
-        }
-        normalized.text = text;
-        normalized.colorKey = LEGEND[colorKey] ? colorKey : "none";
-      } else {
-        continue;
-      }
-
-      tasks[key] = normalized;
-    }
-
-    return { collaborators, tasks };
+    return normalizeState(JSON.parse(raw));
   } catch (_) {
     return null;
   }
 }
 
-function saveState() {
+function saveState(options = {}) {
+  saveLocalState();
+
+  if (!options.localOnly && !isApplyingRemoteState) {
+    queueRemoteSave();
+  }
+}
+
+function saveLocalState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   localStorage.removeItem(LEGACY_STORAGE_KEY);
+}
+
+function normalizeState(parsed) {
+  if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.collaborators)) {
+    return null;
+  }
+
+  const sourceTasks = parsed.tasks && typeof parsed.tasks === "object" ? parsed.tasks : {};
+  const collaborators = parsed.collaborators
+    .filter((item) => item && typeof item.id === "string" && typeof item.name === "string")
+    .map((item) => ({ id: item.id, name: item.name.trim() }))
+    .filter((item) => item.name.length > 0);
+
+  const tasks = {};
+  for (const [key, value] of Object.entries(sourceTasks)) {
+    if (!value || typeof value !== "object") {
+      continue;
+    }
+
+    const done = Boolean(value.done);
+    const free = Boolean(value.free);
+    const team = typeof value.team === "string" ? value.team.trim() : "";
+    let taskId = typeof value.taskId === "string" ? value.taskId.trim() : "";
+    const text = typeof value.text === "string" ? value.text.trim() : "";
+    const colorKey = typeof value.colorKey === "string" ? value.colorKey.trim() : "";
+
+    if (free || normalizeText(text) === "free") {
+      tasks[key] = { free: true };
+      continue;
+    }
+
+    if (!taskId && team && text) {
+      taskId = findTaskIdByText(team, text);
+    }
+
+    const normalized = { done };
+    if (team) {
+      normalized.team = team;
+    }
+    if (taskId && findTask(team, taskId)) {
+      normalized.taskId = taskId;
+    } else if (text) {
+      if (taskId) {
+        normalized.taskId = "";
+      }
+      normalized.text = text;
+      normalized.colorKey = LEGEND[colorKey] ? colorKey : "none";
+    } else {
+      continue;
+    }
+
+    tasks[key] = normalized;
+  }
+
+  return { collaborators, tasks };
+}
+
+function initRemoteSync() {
+  if (!window.firebase || typeof firebase.initializeApp !== "function" || typeof firebase.database !== "function") {
+    setSyncStatus("Modo local", "offline");
+    return;
+  }
+
+  try {
+    const app = firebase.apps && firebase.apps.length > 0
+      ? firebase.app()
+      : firebase.initializeApp(FIREBASE_CONFIG);
+    const database = firebase.database(app);
+    remoteBoardRef = database.ref(REMOTE_BOARD_PATH);
+    setSyncStatus("Conectando...", "busy");
+
+    database.ref(".info/connected").on("value", (snapshot) => {
+      if (snapshot.val() === true) {
+        setSyncStatus(hasRemoteSnapshot ? "Sincronizado" : "Conectado", "online");
+      } else {
+        setSyncStatus("Sin conexion", "offline");
+      }
+    });
+
+    remoteBoardRef.on("value", (snapshot) => {
+      hasRemoteSnapshot = true;
+      const remoteState = parseRemoteState(snapshot.val());
+
+      if (!remoteState) {
+        setSyncStatus("Subiendo datos iniciales...", "busy");
+        queueRemoteSave({ immediate: true });
+        return;
+      }
+
+      isApplyingRemoteState = true;
+      state = remoteState;
+      saveState({ localOnly: true });
+      isApplyingRemoteState = false;
+      renderAll();
+      setSyncStatus("Sincronizado", "online");
+    }, (error) => {
+      console.error("Firebase sync error", error);
+      setSyncStatus("Error de sincronizacion", "error");
+    });
+  } catch (error) {
+    console.error("Firebase init error", error);
+    setSyncStatus("Modo local", "offline");
+  }
+}
+
+function parseRemoteState(value) {
+  try {
+    if (!value) {
+      return null;
+    }
+    if (typeof value === "string") {
+      return normalizeState(JSON.parse(value));
+    }
+    if (typeof value.stateJson === "string") {
+      return normalizeState(JSON.parse(value.stateJson));
+    }
+    return normalizeState(value);
+  } catch (_) {
+    return null;
+  }
+}
+
+function queueRemoteSave(options = {}) {
+  if (!remoteBoardRef) {
+    return;
+  }
+
+  window.clearTimeout(remoteSaveTimer);
+  const delay = options.immediate ? 0 : SYNC_DEBOUNCE_MS;
+  remoteSaveTimer = window.setTimeout(() => {
+    setSyncStatus("Guardando...", "busy");
+    remoteBoardRef.set({
+      stateJson: JSON.stringify(state),
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    }).then(() => {
+      setSyncStatus("Sincronizado", "online");
+    }).catch((error) => {
+      console.error("Firebase save error", error);
+      setSyncStatus("Error al guardar", "error");
+    });
+  }, delay);
+}
+
+function setSyncStatus(message, stateName) {
+  if (!syncStatus) {
+    return;
+  }
+  syncStatus.textContent = message;
+  syncStatus.dataset.state = stateName || "busy";
 }
 
 function renderAll() {

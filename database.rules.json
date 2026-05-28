@@ -1,0 +1,13 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "boards": {
+      "main": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['stateJson']) && newData.child('stateJson').isString()"
+      }
+    }
+  }
+}

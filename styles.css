@@ -40,6 +40,37 @@ body {
   opacity: 0.95;
 }
 
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.55rem;
+  border-radius: 999px;
+  padding: 0.22rem 0.62rem;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.sync-status[data-state="online"] {
+  background: #e1f8df;
+  border-color: #a7d7a0;
+  color: #255a1c;
+}
+
+.sync-status[data-state="busy"] {
+  background: #fff3c6;
+  border-color: #ead98b;
+  color: #68560d;
+}
+
+.sync-status[data-state="offline"],
+.sync-status[data-state="error"] {
+  background: #ffe3df;
+  border-color: #efafa6;
+  color: #7d251d;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 2.2fr) minmax(320px, 1fr);

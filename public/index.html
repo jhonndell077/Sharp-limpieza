@@ -10,6 +10,7 @@
   <header class="app-header">
     <h1>Sharp de Limpieza</h1>
     <p>Calendario de ejecucion diaria con control de pendientes y realizadas.</p>
+    <span id="sync-status" class="sync-status" data-state="busy">Conectando...</span>
   </header>
 
   <main class="layout">
@@ -97,6 +98,8 @@
     </aside>
   </main>
 
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
