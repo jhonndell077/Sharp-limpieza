@@ -3,6 +3,9 @@ const STORAGE_KEY = "sharp_limpieza_board_v3";
 const REMOTE_BOARD_PATH = "boards/main";
 const SYNC_DEBOUNCE_MS = 250;
 
+// Paste here the URL of your deployed Google Apps Script web app
+const APPS_SCRIPT_URL = "";
+
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDvx6sjsvCEOiKQT6fbyx1SF7wuogZfOHI",
   authDomain: "sharplimpieza.firebaseapp.com",
@@ -390,18 +393,18 @@ async function openPhotoModal(taskLabel) {
       setTimeout(() => reject(new Error("timeout")), 8000);
     });
     photoVideo.play();
-    photoStatusText.textContent = "✓ Tarea marcada. Toma una foto como evidencia o presiona Omitir.";
+    photoStatusText.textContent = "Apunta la cámara a la tarea y toma la foto.";
     photoCaptureBtn.disabled    = false;
   } catch (_) {
-    photoStatusText.textContent = "✓ Tarea marcada. No se pudo abrir la cámara — presiona Omitir para continuar.";
+    photoStatusText.textContent = "No se pudo abrir la cámara. Cierra (✕) para cancelar.";
   }
 
   return new Promise((resolve) => { photoModalResolve = resolve; });
 }
 
 photoCaptureBtn.addEventListener("click", () => {
-  const w = 800;
-  const h = Math.round(w * (photoVideo.videoHeight / photoVideo.videoWidth)) || 600;
+  const w = 600;
+  const h = Math.round(w * (photoVideo.videoHeight / photoVideo.videoWidth)) || 450;
   photoCanvas.width  = w;
   photoCanvas.height = h;
   photoCanvas.getContext("2d").drawImage(photoVideo, 0, 0, w, h);
@@ -418,7 +421,7 @@ photoCaptureBtn.addEventListener("click", () => {
     photoRetakeBtn.style.display  = "";
     photoConfirmBtn.disabled      = false;
     photoRetakeBtn.disabled       = false;
-  }, "image/jpeg", 0.80);
+  }, "image/jpeg", 0.70);
 });
 
 photoRetakeBtn.addEventListener("click", () => {
@@ -438,44 +441,50 @@ photoConfirmBtn.addEventListener("click", async () => {
   photoRetakeBtn.disabled     = true;
   photoStatusText.textContent = "Subiendo foto...";
 
+  // Build compressed base64 (600px, q=0.70) — used both for Drive and fallback
+  const tmp = document.createElement("canvas");
+  const w   = Math.min(600, photoCanvas.width);
+  const h   = Math.round(w * photoCanvas.height / (photoCanvas.width || 1));
+  tmp.width  = w;
+  tmp.height = h;
+  tmp.getContext("2d").drawImage(photoCanvas, 0, 0, w, h);
+  const imageBase64 = tmp.toDataURL("image/jpeg", 0.70);
+
   let photoUrl = null;
 
-  if (firebaseStorage && selectedCell) {
+  if (APPS_SCRIPT_URL && selectedCell) {
     try {
-      const path = `task-evidence/${selectedCell.collaboratorId}/${Date.now()}.jpg`;
-      const ref  = firebaseStorage.ref(path);
-      const uploadAndGet = async () => {
-        await ref.put(photoBlob, { contentType: "image/jpeg" });
-        return ref.getDownloadURL();
-      };
-      const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("upload timeout")), 8000)
-      );
-      photoUrl = await Promise.race([uploadAndGet(), timeout]);
+      const collaborator = state.collaborators.find((c) => c.id === selectedCell.collaboratorId);
+      const taskLabel    = photoModalLabel.textContent;
+      const dayName      = DAYS[selectedCell.dayIndex];
+      const body = JSON.stringify({
+        imageBase64,
+        weekLabel:         getWeekFolderLabel(),
+        taskName:          taskLabel,
+        collaboratorName:  collaborator ? collaborator.name : "Desconocido",
+        dayName
+      });
+      const resp = await Promise.race([
+        fetch(APPS_SCRIPT_URL, { method: "POST", body }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000))
+      ]);
+      const result = await resp.json();
+      if (result.ok) photoUrl = result.url;
     } catch (err) {
-      console.warn("Storage upload failed/timed out, using base64 fallback:", err.message);
+      console.warn("Drive upload failed, using base64 fallback:", err.message);
     }
   }
 
-  if (!photoUrl) {
-    // Compress: resize to 480 px wide, quality 0.65
-    const tmp = document.createElement("canvas");
-    const w   = Math.min(480, photoCanvas.width);
-    const h   = Math.round(w * photoCanvas.height / (photoCanvas.width || 1));
-    tmp.width  = w;
-    tmp.height = h;
-    tmp.getContext("2d").drawImage(photoCanvas, 0, 0, w, h);
-    photoUrl = tmp.toDataURL("image/jpeg", 0.65);
-  }
+  // Fallback: store base64 directly in Firebase Database
+  if (!photoUrl) photoUrl = imageBase64;
 
   photoOverlayMsg.textContent = "✓ Foto guardada";
   photoOverlayMsg.className   = "photo-overlay-msg success";
-  photoStatusText.textContent = "Tarea marcada como realizada con evidencia fotográfica.";
+  photoStatusText.textContent = "Evidencia guardada. Tarea marcada como realizada.";
   setTimeout(() => closePhotoModal(photoUrl), 800);
 });
 
 photoModalCloseBtn.addEventListener("click", () => closePhotoModal(null));
-photoCancelBtn.addEventListener("click",     () => closePhotoModal(null));
 
 function closePhotoModal(photoUrl) {
   if (photoStream) {
@@ -553,31 +562,31 @@ async function toggleTaskDone(index, done) {
     return;
   }
 
-  // ── Marcar como realizada INMEDIATAMENTE ──
+  // ── Foto de evidencia REQUERIDA antes de marcar ──
   const capturedCollabId = selectedCell.collaboratorId;
   const capturedDayIndex = selectedCell.dayIndex;
-  cellData.items[index].done        = true;
-  cellData.items[index].completedAt = new Date().toISOString();
-  saveState();
-  renderTable();
-  renderModalTaskList();
-
-  // ── Foto de evidencia (opcional, no bloquea el marcado) ──
   const meta  = resolveTaskMeta(cellData.items[index]);
   const label = `${meta.taskName} · ${DAYS[capturedDayIndex]}`;
   const photoUrl = await openPhotoModal(label);
 
-  if (photoUrl) {
-    const k  = buildCellKey(capturedCollabId, capturedDayIndex);
-    const cd = state.tasks[k];
-    if (cd?.items?.[index]) {
-      cd.items[index].evidencePhotoUrl = photoUrl;
-      saveState();
-      if (selectedCell?.collaboratorId === capturedCollabId &&
-          selectedCell?.dayIndex === capturedDayIndex) {
-        renderModalTaskList();
-      }
-    }
+  // If user closed without photo (✕), leave task undone
+  if (!photoUrl) {
+    const cb = modalTaskList.querySelector(`[data-toggle-done="${index}"]`);
+    if (cb) cb.checked = false;
+    return;
+  }
+
+  const k  = buildCellKey(capturedCollabId, capturedDayIndex);
+  const cd = state.tasks[k];
+  if (!cd?.items?.[index]) return;
+  cd.items[index].done             = true;
+  cd.items[index].completedAt      = new Date().toISOString();
+  cd.items[index].evidencePhotoUrl = photoUrl;
+  saveState();
+  renderTable();
+  if (selectedCell?.collaboratorId === capturedCollabId &&
+      selectedCell?.dayIndex === capturedDayIndex) {
+    renderModalTaskList();
   }
 }
 
@@ -649,28 +658,21 @@ function getBlockDays(color) {
 function getTaskAssignee(team, taskId) {
   if (!selectedCell) return null;
   const { dayIndex } = selectedCell;
-
   const task      = findTask(team, taskId);
   const blockDays = getBlockDays(task ? task.color : "none");
-
-  // An assignment on day d blocks the range [d, d + blockDays - 1].
-  // dayIndex is blocked when some assigned day d satisfies:
-  //   d <= dayIndex  AND  dayIndex <= d + blockDays - 1
-  //   => dayIndex - blockDays + 1 <= d <= dayIndex
-  const startDay = blockDays >= 7 ? 0 : Math.max(0, dayIndex - blockDays + 1);
-  const endDay   = blockDays >= 7 ? 6 : dayIndex;
+  const isWeekly  = blockDays >= 7;
 
   for (const collaborator of state.collaborators) {
-    for (let d = startDay; d <= endDay; d++) {
+    for (let d = 0; d <= 6; d++) {
       const key      = buildCellKey(collaborator.id, d);
       const cellData = state.tasks[key];
       if (!cellData || !Array.isArray(cellData.items)) continue;
-      if (cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
-        // If blocked because of an assignment on a DIFFERENT day, show which day
-        return d === dayIndex
-          ? collaborator.name
-          : `${collaborator.name} (${DAYS[d]})`;
-      }
+      if (!cellData.items.some((item) => item.team === team && item.taskId === taskId)) continue;
+      const blocked = isWeekly || (dayIndex >= d && dayIndex < d + blockDays);
+      if (!blocked) continue;
+      return d === dayIndex
+        ? collaborator.name
+        : `${collaborator.name} (${DAYS[d]})`;
     }
   }
   return null;
@@ -1062,6 +1064,15 @@ function renderWeekLabel() {
   };
   const el = document.getElementById("week-range");
   if (el) el.textContent = `Del ${fmt(monday)} Hasta ${fmt(sunday)}`;
+}
+
+function getWeekFolderLabel() {
+  const monday = strToMonday(currentWeekStart);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = (d) =>
+    `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${fmt(monday)} - ${fmt(sunday)}`;
 }
 
 function renderRealizadasPanel() {
