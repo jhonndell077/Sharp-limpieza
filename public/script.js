@@ -25,7 +25,7 @@ const LEGEND = {
   none:   { symbol: "⚪", label: "Sin color definido en PDF",        short: "Sin color",            css: "lg-none"   }
 };
 
-const TASK_LIBRARY = {
+let TASK_LIBRARY = {
   Freidora: [
     { id: "canastas",            name: "Canastas",                              color: "orange" },
     { id: "tapas",               name: "Tapas",                                 color: "red"    },
@@ -131,8 +131,13 @@ const TASK_LIBRARY = {
   ]
 };
 
-const TEAM_NAMES = Object.keys(TASK_LIBRARY);
+let TEAM_NAMES = Object.keys(TASK_LIBRARY);
 const TASK_INDEX = buildTaskIndex();
+
+const ADMIN_PIN = "852347";
+let libraryRef       = null;
+let libraryUnlocked  = false;
+let firebaseDB       = null;
 
 // DOM refs
 const collaboratorForm  = document.getElementById("collaborator-form");
@@ -174,6 +179,13 @@ const photoVideo         = document.getElementById("photo-video");
 const photoCanvas        = document.getElementById("photo-canvas");
 const photoOverlayMsg    = document.getElementById("photo-overlay-msg");
 const photoStatusText    = document.getElementById("photo-status-text");
+
+const libraryModalOverlay  = document.getElementById("library-modal-overlay");
+const libraryPinView       = document.getElementById("library-pin-view");
+const libraryMgmtView      = document.getElementById("library-mgmt-view");
+const libraryPinInput      = document.getElementById("library-pin-input");
+const libraryPinError      = document.getElementById("library-pin-error");
+const libraryMgmtBody      = document.getElementById("library-mgmt-body");
 
 let currentWeekStart  = getActiveWeekMondayStr();
 let isOnAutoWeek      = true;
@@ -339,6 +351,221 @@ realizadasBtn.addEventListener("click", () => {
 });
 realizadasCloseBtn.addEventListener("click", () => realizadasPanel.classList.add("hidden"));
 realizadasBackdrop.addEventListener("click", () => realizadasPanel.classList.add("hidden"));
+
+// ── Library Modal ──────────────────────────────────────────────────────
+
+document.getElementById("library-btn").addEventListener("click", openLibraryModal);
+document.getElementById("library-pin-close-btn").addEventListener("click", closeLibraryModal);
+document.getElementById("library-pin-cancel-btn").addEventListener("click", closeLibraryModal);
+document.getElementById("library-mgmt-close-btn").addEventListener("click", closeLibraryModal);
+document.getElementById("library-mgmt-cancel-btn").addEventListener("click", closeLibraryModal);
+document.getElementById("library-pin-verify-btn").addEventListener("click", verifyLibraryPin);
+document.getElementById("library-pin-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") verifyLibraryPin();
+});
+document.getElementById("library-add-team-btn").addEventListener("click", () => {
+  const form = document.getElementById("lib-new-team-form");
+  form.classList.add("visible");
+  document.getElementById("lib-new-team-input").focus();
+});
+
+function openLibraryModal() {
+  libraryModalOverlay.classList.remove("hidden");
+  if (libraryUnlocked) {
+    showLibraryMgmt();
+  } else {
+    libraryPinView.classList.remove("hidden");
+    libraryMgmtView.classList.add("hidden");
+    libraryPinInput.value = "";
+    libraryPinError.classList.add("hidden");
+    setTimeout(() => libraryPinInput.focus(), 80);
+  }
+}
+
+function closeLibraryModal() {
+  libraryModalOverlay.classList.add("hidden");
+}
+
+function verifyLibraryPin() {
+  if (libraryPinInput.value === ADMIN_PIN) {
+    libraryUnlocked = true;
+    showLibraryMgmt();
+  } else {
+    libraryPinError.classList.remove("hidden");
+    libraryPinInput.value = "";
+    libraryPinInput.focus();
+  }
+}
+
+function showLibraryMgmt() {
+  libraryPinView.classList.add("hidden");
+  libraryMgmtView.classList.remove("hidden");
+  renderLibraryMgmt();
+}
+
+function renderLibraryMgmt() {
+  const teams = Object.keys(TASK_LIBRARY);
+  libraryMgmtBody.innerHTML = `
+    <div id="lib-new-team-form" class="lib-new-team-form">
+      <input type="text" id="lib-new-team-input" placeholder="Nombre del equipo" maxlength="50">
+      <div class="lib-form-actions">
+        <button type="button" id="lib-save-team-btn">Guardar equipo</button>
+        <button type="button" id="lib-cancel-team-btn" class="secondary">Cancelar</button>
+      </div>
+    </div>
+    ${teams.map(renderLibTeamSection).join("")}
+  `;
+
+  document.getElementById("lib-cancel-team-btn").addEventListener("click", () => {
+    document.getElementById("lib-new-team-form").classList.remove("visible");
+    document.getElementById("lib-new-team-input").value = "";
+  });
+
+  document.getElementById("lib-save-team-btn").addEventListener("click", () => {
+    const input = document.getElementById("lib-new-team-input");
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    if (TASK_LIBRARY[name]) { alert("Ya existe un equipo con ese nombre."); return; }
+    TASK_LIBRARY[name] = [];
+    saveLibraryToFirebase();
+    rebuildLibraryDerived();
+    renderLibraryMgmt();
+  });
+
+  libraryMgmtBody.querySelectorAll(".lib-delete-team").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (!confirm(`¿Eliminar el equipo "${btn.dataset.team}" y todas sus tareas?`)) return;
+      delete TASK_LIBRARY[btn.dataset.team];
+      saveLibraryToFirebase();
+      rebuildLibraryDerived();
+      renderLibraryMgmt();
+    });
+  });
+
+  libraryMgmtBody.querySelectorAll(".lib-delete-task").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const { team, taskId } = btn.dataset;
+      if (!TASK_LIBRARY[team]) return;
+      TASK_LIBRARY[team] = TASK_LIBRARY[team].filter((t) => t.id !== taskId);
+      saveLibraryToFirebase();
+      rebuildLibraryDerived();
+      renderLibraryMgmt();
+    });
+  });
+
+  libraryMgmtBody.querySelectorAll(".lib-show-add-task").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const form = btn.closest(".lib-tasks").querySelector(".lib-add-task-form");
+      form.classList.add("visible");
+      btn.style.display = "none";
+      form.querySelector(".lib-task-name-input").focus();
+    });
+  });
+
+  libraryMgmtBody.querySelectorAll(".lib-cancel-task-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const form = btn.closest(".lib-add-task-form");
+      form.classList.remove("visible");
+      const showBtn = form.closest(".lib-tasks").querySelector(".lib-show-add-task");
+      if (showBtn) showBtn.style.display = "";
+    });
+  });
+
+  libraryMgmtBody.querySelectorAll(".lib-save-task-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const form = btn.closest(".lib-add-task-form");
+      const nameInput = form.querySelector(".lib-task-name-input");
+      const colorSelect = form.querySelector(".lib-color-select");
+      const name = nameInput.value.trim();
+      const color = colorSelect.value;
+      const team = btn.dataset.team;
+      if (!name) { nameInput.focus(); return; }
+      const id = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `task-${Date.now()}`;
+      if (!TASK_LIBRARY[team]) TASK_LIBRARY[team] = [];
+      if (TASK_LIBRARY[team].some((t) => t.id === id)) {
+        alert("Ya existe una tarea similar. Usa un nombre diferente."); return;
+      }
+      TASK_LIBRARY[team].push({ id, name, color });
+      saveLibraryToFirebase();
+      rebuildLibraryDerived();
+      renderLibraryMgmt();
+    });
+  });
+}
+
+function renderLibTeamSection(team) {
+  const tasks = TASK_LIBRARY[team] || [];
+  const colorOpts = Object.entries(LEGEND)
+    .map(([k, v]) => `<option value="${k}">${v.symbol} ${v.short}</option>`)
+    .join("");
+  return `
+    <div class="lib-team-section">
+      <div class="lib-team-header">
+        <span class="lib-team-name">${escapeHtml(team)}</span>
+        <button type="button" class="lib-delete-team" data-team="${escapeHtml(team)}">🗑 Eliminar equipo</button>
+      </div>
+      <div class="lib-tasks">
+        ${tasks.map((task) => {
+          const leg = LEGEND[task.color] || LEGEND.none;
+          return `
+            <div class="lib-task-row">
+              <span>${leg.symbol}</span>
+              <span class="lib-task-name">${escapeHtml(task.name)}</span>
+              <span class="lib-task-freq">${escapeHtml(leg.short)}</span>
+              <button type="button" class="lib-delete-task" data-team="${escapeHtml(team)}" data-task-id="${escapeHtml(task.id)}">✕</button>
+            </div>`;
+        }).join("")}
+        <div class="lib-add-task-form">
+          <input type="text" class="lib-task-name-input" placeholder="Nombre de la tarea" maxlength="60">
+          <select class="lib-color-select">${colorOpts}</select>
+          <div class="lib-form-actions">
+            <button type="button" class="lib-save-task-btn" data-team="${escapeHtml(team)}">Guardar tarea</button>
+            <button type="button" class="lib-cancel-task-btn secondary">Cancelar</button>
+          </div>
+        </div>
+        <button type="button" class="lib-show-add-task" data-team="${escapeHtml(team)}">+ Agregar tarea</button>
+      </div>
+    </div>`;
+}
+
+function rebuildLibraryDerived() {
+  TEAM_NAMES = Object.keys(TASK_LIBRARY);
+  TASK_INDEX.clear();
+  for (const [team, tasks] of Object.entries(TASK_LIBRARY)) {
+    for (const task of tasks) TASK_INDEX.set(`${team}__${task.id}`, task);
+  }
+  updateTeamSelectors();
+}
+
+function saveLibraryToFirebase() {
+  if (!libraryRef) return;
+  libraryRef.set(JSON.stringify(TASK_LIBRARY));
+}
+
+function initLibrarySync() {
+  if (!firebaseDB) return;
+  libraryRef = firebaseDB.ref("library");
+  libraryRef.on("value", (snap) => {
+    const json = snap.val();
+    if (!json) return;
+    try {
+      TASK_LIBRARY = JSON.parse(json);
+      TEAM_NAMES   = Object.keys(TASK_LIBRARY);
+      TASK_INDEX.clear();
+      for (const [team, tasks] of Object.entries(TASK_LIBRARY)) {
+        for (const task of tasks) TASK_INDEX.set(`${team}__${task.id}`, task);
+      }
+      updateTeamSelectors();
+      if (!modalOverlay.classList.contains("hidden")) {
+        renderTaskChecklist(taskTeam.value);
+      }
+      if (!libraryMgmtView.classList.contains("hidden")) {
+        renderLibraryMgmt();
+      }
+    } catch (_) {}
+  });
+}
 
 // ── Modal ─────────────────────────────────────────────────────────────
 
@@ -773,6 +1000,7 @@ function initRemoteSync() {
   try {
     const app = firebase.apps && firebase.apps.length > 0 ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
     const database = firebase.database(app);
+    firebaseDB = database;
     remoteBoardRef = database.ref(REMOTE_BOARD_PATH);
 
     if (typeof firebase.storage === "function") {
@@ -805,6 +1033,7 @@ function initRemoteSync() {
       console.error("Firebase sync error", err);
       setSyncStatus("Error de sincronizacion", "error");
     });
+    initLibrarySync();
   } catch (err) {
     console.error("Firebase init error", err);
     setSyncStatus("Modo local", "offline");

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
   <header class="app-header">
@@ -15,6 +15,7 @@
         <span id="sync-status" class="sync-status" data-state="busy">Conectando...</span>
       </div>
       <button type="button" id="realizadas-btn" class="realizadas-open-btn">📋 Realizadas</button>
+      <button type="button" id="library-btn" class="realizadas-open-btn">⚙️ Tareas</button>
     </div>
   </header>
 
@@ -143,9 +144,49 @@
     </div>
   </div>
 
+  <!-- Modal: Biblioteca de Tareas -->
+  <div id="library-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-card library-modal-card">
+      <!-- PIN view -->
+      <div id="library-pin-view">
+        <div class="modal-head">
+          <div>
+            <span class="modal-kicker">Acceso restringido</span>
+            <strong>Gestión de Tareas</strong>
+          </div>
+          <button type="button" id="library-pin-close-btn" class="modal-close-btn">✕</button>
+        </div>
+        <div class="modal-body library-pin-body">
+          <p class="library-pin-desc">Ingresa el código para gestionar equipos y tareas.</p>
+          <input type="password" id="library-pin-input" class="library-pin-input" maxlength="6" placeholder="Código de acceso" inputmode="numeric" autocomplete="off">
+          <p id="library-pin-error" class="library-pin-error hidden">Código incorrecto. Intenta de nuevo.</p>
+        </div>
+        <div class="modal-foot">
+          <button type="button" id="library-pin-verify-btn">Verificar</button>
+          <button type="button" id="library-pin-cancel-btn" class="secondary">Cancelar</button>
+        </div>
+      </div>
+      <!-- Management view -->
+      <div id="library-mgmt-view" class="hidden">
+        <div class="modal-head">
+          <div>
+            <span class="modal-kicker">Biblioteca de tareas</span>
+            <strong>Equipos y Tareas</strong>
+          </div>
+          <button type="button" id="library-mgmt-close-btn" class="modal-close-btn">✕</button>
+        </div>
+        <div id="library-mgmt-body" class="modal-body library-mgmt-body"></div>
+        <div class="modal-foot">
+          <button type="button" id="library-add-team-btn">+ Nuevo equipo</button>
+          <button type="button" id="library-mgmt-cancel-btn" class="secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
-  <script src="script.js?v=15"></script>
+  <script src="script.js?v=16"></script>
 </body>
 </html>
