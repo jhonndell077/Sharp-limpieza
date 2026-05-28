@@ -523,7 +523,7 @@ function renderModalTaskList() {
         </label>
         ${lockBadge}
         ${thumbHtml}
-        <button type="button" class="modal-task-remove" data-remove-task="${index}" title="Eliminar">✕</button>
+        ${item.done ? "" : `<button type="button" class="modal-task-remove" data-remove-task="${index}" title="Eliminar">✕</button>`}
       </div>
     `;
   }).join("");
@@ -586,6 +586,7 @@ function removeTask(index) {
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
   const cellData = state.tasks[key];
   if (!cellData || !Array.isArray(cellData.items)) return;
+  if (cellData.items[index]?.done) return; // locked — cannot remove completed tasks
   cellData.items.splice(index, 1);
   if (cellData.items.length === 0) {
     delete state.tasks[key];

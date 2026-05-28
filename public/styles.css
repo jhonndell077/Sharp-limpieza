@@ -488,9 +488,11 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.5;
+  text-decoration: line-through;
 }
 
-.task-chip.chip-done { opacity: 0.42; text-decoration: line-through; }
+/* Done chips get additional fade to distinguish completed from just-assigned */
+.task-chip.chip-done { opacity: 0.38; }
 
 .task-empty {
   font-size: 0.75rem;
@@ -720,6 +722,7 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
 }
 
 .checklist-item-assigned { opacity: 0.4; cursor: not-allowed; }
+.checklist-item-assigned .checklist-name { text-decoration: line-through; }
 
 .checklist-name {
   flex: 1;
