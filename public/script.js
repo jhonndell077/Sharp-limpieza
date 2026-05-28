@@ -189,6 +189,7 @@ let firebaseStorage   = null;
 let photoStream       = null;
 let photoBlob         = null;
 let photoModalResolve = null;
+let pendingPhotoMeta  = null;
 
 updateTeamSelectors();
 renderTable();
@@ -369,7 +370,8 @@ function closeModal() {
 
 // ── Evidencia fotográfica ──────────────────────────────────
 
-async function openPhotoModal(taskLabel) {
+async function openPhotoModal(taskLabel, team, taskName) {
+  pendingPhotoMeta = team && taskName ? { team, taskName } : null;
   photoBlob    = null;
   photoCanvas.classList.remove("visible");
   photoVideo.style.display      = "";
@@ -455,14 +457,14 @@ photoConfirmBtn.addEventListener("click", async () => {
   if (APPS_SCRIPT_URL && selectedCell) {
     try {
       const collaborator = state.collaborators.find((c) => c.id === selectedCell.collaboratorId);
-      const taskLabel    = photoModalLabel.textContent;
-      const dayName      = DAYS[selectedCell.dayIndex];
+      const collabName   = collaborator ? collaborator.name : "Desconocido";
+      const fileName     = pendingPhotoMeta
+        ? `${pendingPhotoMeta.team}-${pendingPhotoMeta.taskName}-${collabName}`
+        : photoModalLabel.textContent;
       const body = JSON.stringify({
         imageBase64,
-        weekLabel:         getWeekFolderLabel(),
-        taskName:          taskLabel,
-        collaboratorName:  collaborator ? collaborator.name : "Desconocido",
-        dayName
+        weekLabel:  getWeekFolderLabel(),
+        fileName
       });
       const resp = await Promise.race([
         fetch(APPS_SCRIPT_URL, { method: "POST", body }),
@@ -567,7 +569,7 @@ async function toggleTaskDone(index, done) {
   const capturedDayIndex = selectedCell.dayIndex;
   const meta  = resolveTaskMeta(cellData.items[index]);
   const label = `${meta.taskName} · ${DAYS[capturedDayIndex]}`;
-  const photoUrl = await openPhotoModal(label);
+  const photoUrl = await openPhotoModal(label, meta.team, meta.taskName);
 
   // If user closed without photo (✕), leave task undone
   if (!photoUrl) {
