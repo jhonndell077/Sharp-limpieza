@@ -7,12 +7,6 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="app-header">
-    <h1>Sharp de Limpieza</h1>
-    <p>Calendario de ejecucion diaria con control de pendientes y realizadas.</p>
-    <span id="sync-status" class="sync-status" data-state="busy">Conectando...</span>
-  </header>
-
   <main class="layout">
     <section class="board-section">
       <div class="toolbar">
@@ -44,61 +38,39 @@
         </table>
       </div>
     </section>
-
-    <aside class="side-panel">
-      <section class="card">
-        <h2>Editar casilla</h2>
-        <p id="selected-cell-label">Selecciona una casilla del calendario para cargar la tarea.</p>
-
-        <form id="task-form">
-          <label for="task-team">Paso 1 - Equipo</label>
-          <select id="task-team"></select>
-
-          <label for="task-item">Paso 2 - Tarea del equipo</label>
-          <select id="task-item"></select>
-          <p id="task-frequency-hint" class="hint-text">Selecciona equipo y tarea para ver la frecuencia del sharp.</p>
-
-          <label class="checkbox-row" for="task-free">
-            <input id="task-free" type="checkbox">
-            Colaborador libre (FREE - no trabaja)
-          </label>
-
-          <label class="checkbox-row" for="task-done">
-            <input id="task-done" type="checkbox">
-            Marcar como realizada
-          </label>
-
-          <div class="action-row">
-            <button type="submit">Guardar tarea</button>
-            <button id="clear-task" type="button" class="secondary">Limpiar casilla</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Resumen</h2>
-        <div class="filter-row">
-          <label for="team-filter">Equipo para ver realizadas</label>
-          <select id="team-filter"></select>
-        </div>
-        <div class="summary-columns">
-          <div>
-            <h3>Pendientes (<span id="pending-count">0</span>)</h3>
-            <ul id="pending-list" class="task-list"></ul>
-          </div>
-          <div>
-            <h3>Realizadas (<span id="done-count">0</span>)</h3>
-            <ul id="done-list" class="task-list"></ul>
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>Leyenda de colores</h2>
-        <ul id="legend-list" class="legend-list"></ul>
-      </section>
-    </aside>
   </main>
+
+  <div id="editor-backdrop" class="editor-backdrop" hidden>
+    <section class="floating-editor-card" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+      <div class="floating-editor-head">
+        <div>
+          <span class="floating-editor-kicker">Editor de tareas</span>
+          <strong id="editor-title">Editar casilla</strong>
+          <p id="editor-subtitle"></p>
+        </div>
+        <button id="editor-close" type="button" class="editor-danger" aria-label="Cerrar editor">X</button>
+      </div>
+
+      <div class="floating-editor-body">
+        <label class="floating-field" for="editor-team">
+          <span>Equipo a trabajar</span>
+          <select id="editor-team"></select>
+        </label>
+
+        <div class="floating-list-head">
+          <strong>Tareas disponibles</strong>
+        </div>
+
+        <div id="editor-task-list" class="task-checklist"></div>
+      </div>
+
+      <div class="floating-editor-foot">
+        <button id="editor-clear" type="button" class="editor-warning">LIMPIAR CASILLA</button>
+        <button id="editor-cancel" type="button" class="editor-secondary">CANCELAR</button>
+        <button id="editor-save" type="button" class="editor-save">GUARDAR CAMBIOS</button>
+      </div>
+    </section>
+  </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>

@@ -1,6 +1,6 @@
 const DAYS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
-const STORAGE_KEY = "sharp_limpieza_board_v2";
-const LEGACY_STORAGE_KEY = "sharp_limpieza_board_v1";
+const STORAGE_KEY = "sharp_limpieza_board_v3";
+const PREVIOUS_STORAGE_KEYS = ["sharp_limpieza_board_v2", "sharp_limpieza_board_v1"];
 const REMOTE_BOARD_PATH = "boards/main";
 const SYNC_DEBOUNCE_MS = 250;
 
@@ -16,37 +16,37 @@ const FIREBASE_CONFIG = {
 
 const LEGEND = {
   red: {
-    symbol: "🟥",
+    symbol: "\uD83D\uDFE5",
     label: "Debe ser cada 1 dia",
     short: "Cada 1 dia",
     css: "lg-red"
   },
   orange: {
-    symbol: "🟧",
+    symbol: "\uD83D\uDFE7",
     label: "Debe ser cada 3 dias",
     short: "Cada 3 dias",
     css: "lg-orange"
   },
   yellow: {
-    symbol: "🟨",
+    symbol: "\uD83D\uDFE8",
     label: "Puede ser cada 4 dias",
     short: "Cada 4 dias",
     css: "lg-yellow"
   },
   green: {
-    symbol: "🟩",
+    symbol: "\uD83D\uDFE9",
     label: "Puede ser una semana (mas trabajo)",
     short: "Semanal (mas trabajo)",
     css: "lg-green"
   },
   purple: {
-    symbol: "🟪",
+    symbol: "\uD83D\uDFEA",
     label: "Puede ser una semana (+)",
     short: "Semanal (+)",
     css: "lg-purple"
   },
   none: {
-    symbol: "⚪",
+    symbol: "\u26AA",
     label: "Sin color definido en PDF",
     short: "Sin color",
     css: "lg-none"
@@ -165,59 +165,28 @@ const TASK_INDEX = buildTaskIndex();
 const collaboratorForm = document.getElementById("collaborator-form");
 const collaboratorInput = document.getElementById("collaborator-name");
 const scheduleBody = document.getElementById("schedule-body");
-const taskForm = document.getElementById("task-form");
-const taskTeam = document.getElementById("task-team");
-const taskItem = document.getElementById("task-item");
-const taskFree = document.getElementById("task-free");
-const taskDone = document.getElementById("task-done");
-const taskFrequencyHint = document.getElementById("task-frequency-hint");
-const selectedCellLabel = document.getElementById("selected-cell-label");
-const pendingList = document.getElementById("pending-list");
-const doneList = document.getElementById("done-list");
-const pendingCount = document.getElementById("pending-count");
-const doneCount = document.getElementById("done-count");
-const teamFilter = document.getElementById("team-filter");
-const clearTaskButton = document.getElementById("clear-task");
 const loadExampleButton = document.getElementById("load-example");
-const legendList = document.getElementById("legend-list");
 const syncStatus = document.getElementById("sync-status");
+const editorBackdrop = document.getElementById("editor-backdrop");
+const editorTitle = document.getElementById("editor-title");
+const editorSubtitle = document.getElementById("editor-subtitle");
+const editorTeam = document.getElementById("editor-team");
+const editorTaskList = document.getElementById("editor-task-list");
+const editorCloseButton = document.getElementById("editor-close");
+const editorCancelButton = document.getElementById("editor-cancel");
+const editorClearButton = document.getElementById("editor-clear");
+const editorSaveButton = document.getElementById("editor-save");
 
 let state = loadState() || createExampleState();
 let selectedCell = null;
+let selectedEditorTeam = TEAM_NAMES[0] || "";
 let remoteBoardRef = null;
 let remoteSaveTimer = null;
 let isApplyingRemoteState = false;
 let hasRemoteSnapshot = false;
 
-clearEditor();
 renderAll();
 initRemoteSync();
-
-teamFilter.addEventListener("change", () => {
-  renderSummary();
-});
-
-taskTeam.addEventListener("change", () => {
-  updateTaskOptions(taskTeam.value, "");
-  syncDoneToggle();
-});
-
-taskItem.addEventListener("change", () => {
-  updateTaskHint(taskTeam.value, taskItem.value);
-  syncDoneToggle();
-});
-
-taskFree.addEventListener("change", () => {
-  if (taskFree.checked) {
-    taskTeam.value = "";
-    updateTaskOptions("", "");
-    taskDone.checked = false;
-    taskFrequencyHint.textContent = "FREE: colaborador libre (no trabaja).";
-  } else {
-    updateTaskOptions(taskTeam.value, taskItem.value);
-  }
-  syncDoneToggle();
-});
 
 collaboratorForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -246,36 +215,7 @@ scheduleBody.addEventListener("click", (event) => {
 
   const removeBtn = target.closest("[data-remove-collaborator]");
   if (removeBtn) {
-    const collaboratorId = removeBtn.getAttribute("data-remove-collaborator");
-    if (!collaboratorId) {
-      return;
-    }
-
-    const collaborator = state.collaborators.find((item) => item.id === collaboratorId);
-    if (!collaborator) {
-      return;
-    }
-
-    const ok = window.confirm(`Eliminar a ${collaborator.name} del calendario?`);
-    if (!ok) {
-      return;
-    }
-
-    state.collaborators = state.collaborators.filter((item) => item.id !== collaboratorId);
-
-    for (const key of Object.keys(state.tasks)) {
-      if (key.startsWith(`${collaboratorId}__`)) {
-        delete state.tasks[key];
-      }
-    }
-
-    if (selectedCell && selectedCell.collaboratorId === collaboratorId) {
-      selectedCell = null;
-      clearEditor();
-    }
-
-    saveState();
-    renderAll();
+    removeCollaborator(removeBtn.getAttribute("data-remove-collaborator"));
     return;
   }
 
@@ -290,56 +230,7 @@ scheduleBody.addEventListener("click", (event) => {
     return;
   }
 
-  selectedCell = { collaboratorId, dayIndex };
-  loadSelectedCellInEditor();
-  renderTable();
-});
-
-taskForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  if (!selectedCell) {
-    return;
-  }
-
-  if (taskFree.checked) {
-    const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-    state.tasks[key] = { free: true };
-    saveState();
-    renderAll();
-    return;
-  }
-
-  const team = taskTeam.value.trim();
-  const taskId = taskItem.value.trim();
-  if (!team) {
-    window.alert("Selecciona un equipo primero.");
-    return;
-  }
-  if (!taskId) {
-    window.alert("Selecciona una tarea del equipo.");
-    return;
-  }
-
-  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-  state.tasks[key] = {
-    team,
-    taskId,
-    done: taskDone.checked
-  };
-
-  saveState();
-  renderAll();
-});
-
-clearTaskButton.addEventListener("click", () => {
-  if (!selectedCell) {
-    return;
-  }
-
-  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-  delete state.tasks[key];
-  saveState();
-  renderAll();
+  openTaskEditor(collaboratorId, dayIndex);
 });
 
 loadExampleButton.addEventListener("click", () => {
@@ -350,9 +241,43 @@ loadExampleButton.addEventListener("click", () => {
 
   state = createExampleState();
   selectedCell = null;
+  closeTaskEditor();
   saveState();
   renderAll();
-  clearEditor();
+});
+
+editorTeam.addEventListener("change", () => {
+  selectedEditorTeam = editorTeam.value;
+  renderEditorTasks();
+});
+
+editorCloseButton.addEventListener("click", closeTaskEditor);
+editorCancelButton.addEventListener("click", closeTaskEditor);
+
+editorBackdrop.addEventListener("click", (event) => {
+  if (event.target === editorBackdrop) {
+    closeTaskEditor();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && isEditorOpen()) {
+    closeTaskEditor();
+  }
+});
+
+editorClearButton.addEventListener("click", () => {
+  if (!selectedCell) {
+    return;
+  }
+
+  delete state.tasks[getSelectedCellKey()];
+  saveState();
+  renderAll();
+});
+
+editorSaveButton.addEventListener("click", () => {
+  saveEditorSelection();
 });
 
 function createExampleState() {
@@ -372,17 +297,128 @@ function createExampleState() {
 }
 
 function putTask(tasks, collaboratorId, dayIndex, team, taskId, done) {
-  tasks[buildCellKey(collaboratorId, dayIndex)] = { team, taskId, done };
+  const key = buildCellKey(collaboratorId, dayIndex);
+  const currentItems = getAssignmentItems(tasks[key]);
+  tasks[key] = {
+    items: dedupeAssignmentItems([
+      ...currentItems,
+      { team, taskId, done: Boolean(done) }
+    ])
+  };
+}
+
+function removeCollaborator(collaboratorId) {
+  if (!collaboratorId) {
+    return;
+  }
+
+  const collaborator = state.collaborators.find((item) => item.id === collaboratorId);
+  if (!collaborator) {
+    return;
+  }
+
+  const ok = window.confirm(`Eliminar a ${collaborator.name} del calendario?`);
+  if (!ok) {
+    return;
+  }
+
+  state.collaborators = state.collaborators.filter((item) => item.id !== collaboratorId);
+
+  for (const key of Object.keys(state.tasks)) {
+    if (key.startsWith(`${collaboratorId}__`)) {
+      delete state.tasks[key];
+    }
+  }
+
+  if (selectedCell && selectedCell.collaboratorId === collaboratorId) {
+    selectedCell = null;
+    closeTaskEditor();
+  }
+
+  saveState();
+  renderAll();
+}
+
+function openTaskEditor(collaboratorId, dayIndex) {
+  selectedCell = { collaboratorId, dayIndex };
+  selectedEditorTeam = chooseInitialEditorTeam();
+  editorBackdrop.hidden = false;
+  document.body.classList.add("modal-open");
+  renderAll();
+  editorTeam.focus();
+}
+
+function closeTaskEditor() {
+  editorBackdrop.hidden = true;
+  document.body.classList.remove("modal-open");
+  renderTable();
+}
+
+function isEditorOpen() {
+  return !editorBackdrop.hidden;
+}
+
+function saveEditorSelection() {
+  if (!selectedCell) {
+    return;
+  }
+
+  const team = editorTeam.value;
+  if (!hasTeam(team)) {
+    window.alert("Selecciona un equipo primero.");
+    return;
+  }
+
+  const cellKey = getSelectedCellKey();
+  const assignmentsByTask = collectAssignmentsByTask();
+  const checkedInputs = editorTaskList.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)');
+  const selectedIds = [...checkedInputs].map((input) => input.value);
+  const currentItems = getCellItems(cellKey);
+  const currentTeamItems = currentItems.filter((item) => item.team === team);
+  const otherTeamItems = currentItems.filter((item) => item.team !== team);
+  const existingByTask = new Map(currentTeamItems.map((item) => [item.taskId, item]));
+  const selectedTeamItems = [];
+
+  for (const taskId of selectedIds) {
+    const lockKey = buildTaskLockKey(team, taskId);
+    const lockedElsewhere = (assignmentsByTask.get(lockKey) || []).some((assignment) => (
+      assignment.cellKey !== cellKey
+    ));
+
+    if (lockedElsewhere || !findTask(team, taskId)) {
+      continue;
+    }
+
+    const existing = existingByTask.get(taskId);
+    selectedTeamItems.push({
+      team,
+      taskId,
+      done: existing ? Boolean(existing.done) : false
+    });
+  }
+
+  setCellItems(cellKey, [...otherTeamItems, ...selectedTeamItems]);
+  saveState();
+  renderAll();
+  closeTaskEditor();
 }
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (!raw) {
-      return null;
+    const keys = [STORAGE_KEY, ...PREVIOUS_STORAGE_KEYS];
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        continue;
+      }
+
+      const parsed = normalizeState(JSON.parse(raw));
+      if (parsed) {
+        return parsed;
+      }
     }
 
-    return normalizeState(JSON.parse(raw));
+    return null;
   } catch (_) {
     return null;
   }
@@ -398,7 +434,10 @@ function saveState(options = {}) {
 
 function saveLocalState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  localStorage.removeItem(LEGACY_STORAGE_KEY);
+
+  for (const key of PREVIOUS_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+  }
 }
 
 function normalizeState(parsed) {
@@ -411,49 +450,70 @@ function normalizeState(parsed) {
     .filter((item) => item && typeof item.id === "string" && typeof item.name === "string")
     .map((item) => ({ id: item.id, name: item.name.trim() }))
     .filter((item) => item.name.length > 0);
-
+  const collaboratorIds = new Set(collaborators.map((item) => item.id));
   const tasks = {};
+
   for (const [key, value] of Object.entries(sourceTasks)) {
-    if (!value || typeof value !== "object") {
+    if (!collaboratorIds.has(parseCellKey(key).collaboratorId)) {
       continue;
     }
 
-    const done = Boolean(value.done);
-    const free = Boolean(value.free);
-    const team = typeof value.team === "string" ? value.team.trim() : "";
-    let taskId = typeof value.taskId === "string" ? value.taskId.trim() : "";
-    const text = typeof value.text === "string" ? value.text.trim() : "";
-    const colorKey = typeof value.colorKey === "string" ? value.colorKey.trim() : "";
-
-    if (free || normalizeText(text) === "free") {
-      tasks[key] = { free: true };
-      continue;
+    const assignment = normalizeAssignment(value);
+    if (assignment) {
+      tasks[key] = assignment;
     }
-
-    if (!taskId && team && text) {
-      taskId = findTaskIdByText(team, text);
-    }
-
-    const normalized = { done };
-    if (team) {
-      normalized.team = team;
-    }
-    if (taskId && findTask(team, taskId)) {
-      normalized.taskId = taskId;
-    } else if (text) {
-      if (taskId) {
-        normalized.taskId = "";
-      }
-      normalized.text = text;
-      normalized.colorKey = LEGEND[colorKey] ? colorKey : "none";
-    } else {
-      continue;
-    }
-
-    tasks[key] = normalized;
   }
 
   return { collaborators, tasks };
+}
+
+function normalizeAssignment(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const text = typeof value.text === "string" ? value.text.trim() : "";
+  if (Boolean(value.free) || normalizeText(text) === "free") {
+    return { free: true };
+  }
+
+  const sourceItems = Array.isArray(value.items) ? value.items : [value];
+  const items = dedupeAssignmentItems(sourceItems.map(normalizeTaskItem).filter(Boolean));
+
+  return items.length > 0 ? { items } : null;
+}
+
+function normalizeTaskItem(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const done = Boolean(value.done);
+  const team = typeof value.team === "string" ? value.team.trim() : "";
+  let taskId = typeof value.taskId === "string" ? value.taskId.trim() : "";
+  const text = typeof value.text === "string" ? value.text.trim() : "";
+  const colorKey = typeof value.colorKey === "string" && LEGEND[value.colorKey]
+    ? value.colorKey
+    : "none";
+
+  if (team && !taskId && text) {
+    taskId = findTaskIdByText(team, text);
+  }
+
+  if (team && taskId && findTask(team, taskId)) {
+    return { team, taskId, done };
+  }
+
+  if (text) {
+    return {
+      team: team || "Sin equipo",
+      text,
+      colorKey,
+      done
+    };
+  }
+
+  return null;
 }
 
 function initRemoteSync() {
@@ -551,24 +611,12 @@ function setSyncStatus(message, stateName) {
 }
 
 function renderAll() {
-  renderLegend();
-  updateTeamSelectors();
+  validateSelectedCell();
   renderTable();
-  renderSummary();
-  loadSelectedCellInEditor();
-}
 
-function renderLegend() {
-  const order = ["red", "orange", "yellow", "green", "purple", "none"];
-  legendList.innerHTML = order.map((colorKey) => {
-    const item = LEGEND[colorKey];
-    return `
-      <li>
-        <span class="legend-chip ${item.css}">${item.symbol} ${escapeHtml(item.short)}</span>
-        <span>${escapeHtml(item.label)}</span>
-      </li>
-    `;
-  }).join("");
+  if (isEditorOpen()) {
+    renderEditor();
+  }
 }
 
 function renderTable() {
@@ -580,56 +628,11 @@ function renderTable() {
         </td>
       </tr>
     `;
-    clearEditor();
     return;
   }
 
   const rows = state.collaborators.map((collaborator) => {
-    const dayCells = DAYS.map((_, dayIndex) => {
-      const key = buildCellKey(collaborator.id, dayIndex);
-      const assignment = state.tasks[key];
-      const isFree = Boolean(assignment && assignment.free);
-      const meta = assignment && !isFree ? resolveTaskMeta(assignment) : null;
-      const isSelected = Boolean(
-        selectedCell &&
-        selectedCell.collaboratorId === collaborator.id &&
-        selectedCell.dayIndex === dayIndex
-      );
-
-      const statusClass = !assignment ? "" : isFree ? "free" : assignment.done ? "done" : "pending";
-      const selectedClass = isSelected ? "selected" : "";
-      const preview = isFree
-        ? `<span class="free-label">FREE</span>`
-        : meta
-        ? `${meta.legend.symbol} ${escapeHtml(trimText(meta.taskName, 36))}`
-        : "Asignar tarea";
-      const statusText = isFree
-        ? "Colaborador libre"
-        : meta
-        ? `${assignment.done ? "Realizada" : "Pendiente"} - ${escapeHtml(meta.team)}`
-        : "Sin tarea";
-      const title = isFree
-        ? "FREE - colaborador libre (no trabaja)"
-        : meta
-        ? `${meta.team} | ${meta.taskName} | ${meta.legend.label}`
-        : "Sin tarea";
-
-      return `
-        <td class="task-cell" data-day-label="${escapeHtml(DAYS[dayIndex])}">
-          <button
-            type="button"
-            class="cell-btn ${statusClass} ${selectedClass}"
-            data-cell="1"
-            data-collaborator="${collaborator.id}"
-            data-day="${dayIndex}"
-            title="${escapeHtml(title)}"
-          >
-            <span class="task-preview">${preview}</span>
-            <span class="status-preview">${statusText}</span>
-          </button>
-        </td>
-      `;
-    }).join("");
+    const dayCells = DAYS.map((day, dayIndex) => buildDayCellHtml(collaborator, day, dayIndex)).join("");
 
     return `
       <tr>
@@ -639,7 +642,7 @@ function renderTable() {
             <button
               type="button"
               class="remove-btn"
-              data-remove-collaborator="${collaborator.id}"
+              data-remove-collaborator="${escapeHtml(collaborator.id)}"
               title="Eliminar colaborador"
               aria-label="Eliminar colaborador ${escapeHtml(collaborator.name)}"
             >
@@ -655,243 +658,301 @@ function renderTable() {
   scheduleBody.innerHTML = rows;
 }
 
-function renderSummary() {
-  const selectedTeam = teamFilter.value;
-  const pendingItems = [];
-  const doneItems = [];
+function buildDayCellHtml(collaborator, day, dayIndex) {
+  const key = buildCellKey(collaborator.id, dayIndex);
+  const assignment = state.tasks[key];
+  const items = getAssignmentItems(assignment);
+  const isFree = Boolean(assignment && assignment.free);
+  const isSelected = Boolean(
+    selectedCell &&
+    selectedCell.collaboratorId === collaborator.id &&
+    selectedCell.dayIndex === dayIndex
+  );
+  const hasItems = items.length > 0;
+  const allDone = hasItems && items.every((item) => item.done);
+  const statusClass = isFree ? "free" : hasItems ? allDone ? "done" : "pending" : "";
+  const selectedClass = isSelected ? "selected" : "";
+  const cellClass = hasItems || isFree ? "has-task" : "";
+  const title = buildCellTitle(assignment, items);
 
-  for (const collaborator of state.collaborators) {
-    for (let dayIndex = 0; dayIndex < DAYS.length; dayIndex += 1) {
-      const key = buildCellKey(collaborator.id, dayIndex);
-      const assignment = state.tasks[key];
-      if (!assignment || assignment.free) {
-        continue;
-      }
-
-      const meta = resolveTaskMeta(assignment);
-      const detail = {
-        day: DAYS[dayIndex],
-        collaborator: collaborator.name,
-        team: meta.team,
-        taskName: meta.taskName,
-        legend: meta.legend
-      };
-
-      if (assignment.done) {
-        if (selectedTeam && detail.team !== selectedTeam) {
-          continue;
-        }
-        doneItems.push(detail);
-      } else {
-        pendingItems.push(detail);
-      }
-    }
-  }
-
-  pendingCount.textContent = String(pendingItems.length);
-  doneCount.textContent = String(doneItems.length);
-
-  pendingList.innerHTML = pendingItems.length > 0
-    ? pendingItems.map((item) => (
-      `<li class="pending">${buildSummaryItemHtml(item)}</li>`
-    )).join("")
-    : `<li class="empty-text">No hay tareas pendientes.</li>`;
-
-  doneList.innerHTML = doneItems.length > 0
-    ? doneItems.map((item) => (
-      `<li class="done">${buildSummaryItemHtml(item)}</li>`
-    )).join("")
-    : `<li class="empty-text">No hay tareas realizadas${selectedTeam ? ` para ${escapeHtml(selectedTeam)}` : ""}.</li>`;
-}
-
-function buildSummaryItemHtml(item) {
   return `
-    <div class="task-line">
-      <span class="legend-chip ${item.legend.css}">${item.legend.symbol} ${escapeHtml(item.legend.short)}</span>
-      <span><strong>${escapeHtml(item.day)}</strong> - ${escapeHtml(item.collaborator)}: ${escapeHtml(item.taskName)} (${escapeHtml(item.team)})</span>
-    </div>
+    <td class="task-cell ${cellClass}" data-day-label="${escapeHtml(day)}">
+      <button
+        type="button"
+        class="cell-btn ${statusClass} ${selectedClass}"
+        data-cell="1"
+        data-collaborator="${escapeHtml(collaborator.id)}"
+        data-day="${dayIndex}"
+        title="${escapeHtml(title)}"
+      >
+        ${buildCellContentHtml(assignment, items)}
+      </button>
+    </td>
   `;
 }
 
-function loadSelectedCellInEditor() {
+function buildCellContentHtml(assignment, items) {
+  if (assignment && assignment.free) {
+    return `
+      <span class="free-label">FREE</span>
+      <span class="status-preview">Colaborador libre</span>
+    `;
+  }
+
+  if (items.length === 0) {
+    return `
+      <span class="task-preview">Asignar tarea</span>
+      <span class="status-preview">Sin tarea</span>
+    `;
+  }
+
+  const chips = items.map((item) => {
+    const meta = resolveTaskMeta(item);
+    const doneClass = item.done ? "chip-done" : "";
+
+    return `
+      <span class="task-chip chip-locked ${doneClass}">
+        ${meta.legend.symbol} ${escapeHtml(trimText(meta.taskName, 24))} &middot; ${escapeHtml(meta.team)}
+      </span>
+    `;
+  }).join("");
+
+  return `<span class="task-chip-list">${chips}</span>`;
+}
+
+function buildCellTitle(assignment, items) {
+  if (assignment && assignment.free) {
+    return "FREE - colaborador libre";
+  }
+
+  if (items.length === 0) {
+    return "Sin tarea";
+  }
+
+  return items.map((item) => {
+    const meta = resolveTaskMeta(item);
+    return `${meta.team}: ${meta.taskName}`;
+  }).join(" | ");
+}
+
+function renderEditor() {
   if (!selectedCell) {
-    clearEditor();
+    closeTaskEditor();
     return;
   }
 
-  const collaborator = state.collaborators.find((item) => item.id === selectedCell.collaboratorId);
+  const collaborator = findCollaborator(selectedCell.collaboratorId);
   if (!collaborator) {
-    clearEditor();
+    selectedCell = null;
+    closeTaskEditor();
     return;
   }
 
-  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-  const assignment = state.tasks[key];
+  editorTitle.textContent = "Editar casilla";
+  editorSubtitle.textContent = `${collaborator.name} - ${DAYS[selectedCell.dayIndex]}`;
 
-  selectedCellLabel.textContent = `${collaborator.name} - ${DAYS[selectedCell.dayIndex]}`;
-  taskFree.disabled = false;
-  clearTaskButton.disabled = false;
-
-  if (assignment) {
-    if (assignment.free) {
-      taskFree.checked = true;
-      taskTeam.value = "";
-      updateTaskOptions("", "");
-      taskDone.checked = false;
-      taskFrequencyHint.textContent = "FREE: colaborador libre (no trabaja).";
-    } else {
-      taskFree.checked = false;
-      taskTeam.value = assignment.team && hasTeam(assignment.team) ? assignment.team : "";
-      updateTaskOptions(taskTeam.value, assignment.taskId || "");
-      taskDone.checked = Boolean(assignment.done);
-
-      if (!assignment.taskId && assignment.text) {
-        taskFrequencyHint.textContent = `Tarea existente fuera del catalogo: ${assignment.text}.`;
-      }
-    }
-  } else {
-    taskFree.checked = false;
-    taskTeam.value = "";
-    updateTaskOptions("", "");
-    taskDone.checked = false;
-  }
-
-  syncDoneToggle();
-  taskTeam.focus();
-}
-
-function clearEditor() {
-  selectedCellLabel.textContent = "Selecciona una casilla del calendario para cargar la tarea.";
-  taskFree.checked = false;
-  taskTeam.value = "";
-  taskItem.value = "";
-  taskDone.checked = false;
-  taskFree.disabled = true;
-  taskTeam.disabled = true;
-  taskItem.disabled = true;
-  taskDone.disabled = true;
-  clearTaskButton.disabled = true;
-  taskFrequencyHint.textContent = "Selecciona equipo y tarea para ver la frecuencia del sharp.";
-}
-
-function syncDoneToggle() {
-  const hasSelection = Boolean(selectedCell);
-  const isFree = taskFree.checked;
-
-  taskFree.disabled = !hasSelection;
-  taskTeam.disabled = !hasSelection || isFree;
-
-  if (isFree) {
-    taskItem.disabled = true;
-  } else if (!hasSelection) {
-    taskItem.disabled = true;
-  } else if (!taskTeam.value || !hasTeam(taskTeam.value)) {
-    taskItem.disabled = true;
-  } else {
-    taskItem.disabled = false;
-  }
-
-  taskDone.disabled = !hasSelection || isFree || !taskTeam.value || !taskItem.value;
-}
-
-function updateTeamSelectors() {
-  const teams = collectTeamsFromState();
   setSelectOptions(
-    taskTeam,
-    [{ value: "", label: "Seleccionar equipo" }, ...teams.map((team) => ({ value: team, label: team }))],
-    taskTeam.value
+    editorTeam,
+    TEAM_NAMES.map((team) => ({ value: team, label: team })),
+    selectedEditorTeam
   );
-  setSelectOptions(
-    teamFilter,
-    [{ value: "", label: "Todos los equipos" }, ...teams.map((team) => ({ value: team, label: team }))],
-    teamFilter.value
-  );
-  updateTaskOptions(taskTeam.value, taskItem.value);
+
+  selectedEditorTeam = editorTeam.value;
+  renderEditorTasks();
 }
 
-function updateTaskOptions(team, selectedTaskId) {
-  if (!team || !hasTeam(team)) {
-    setSelectOptions(
-      taskItem,
-      [{ value: "", label: "Selecciona un equipo primero" }],
-      ""
-    );
-    taskItem.disabled = true;
-    updateTaskHint("", "");
+function renderEditorTasks() {
+  if (!selectedCell) {
+    editorTaskList.innerHTML = "";
     return;
   }
 
+  const team = editorTeam.value;
+  if (!hasTeam(team)) {
+    editorTaskList.innerHTML = `<p class="empty-text">No hay equipo seleccionado.</p>`;
+    return;
+  }
+
+  const cellKey = getSelectedCellKey();
+  const currentItems = getCellItems(cellKey);
+  const currentTaskIds = new Set(
+    currentItems
+      .filter((item) => item.team === team && item.taskId)
+      .map((item) => item.taskId)
+  );
+  const assignmentsByTask = collectAssignmentsByTask();
   const tasks = TASK_LIBRARY[team] || [];
-  const options = tasks.map((task) => {
+
+  editorTaskList.innerHTML = tasks.map((task) => {
+    const lockKey = buildTaskLockKey(team, task.id);
+    const taskAssignments = assignmentsByTask.get(lockKey) || [];
+    const assignedOutside = taskAssignments.find((assignment) => assignment.cellKey !== cellKey);
+    const assignedHere = currentTaskIds.has(task.id);
+    const checked = assignedHere || Boolean(assignedOutside);
+    const disabled = Boolean(assignedOutside) && !assignedHere;
     const legend = LEGEND[task.color] || LEGEND.none;
-    return {
-      value: task.id,
-      label: `${legend.symbol} ${task.name} - ${legend.short}`
-    };
-  });
+    const itemClasses = [
+      "checklist-item",
+      disabled ? "checklist-item-assigned" : "",
+      assignedHere ? "checklist-item-current" : ""
+    ].filter(Boolean).join(" ");
+    const assignee = disabled ? assignedOutside.collaboratorName : assignedHere ? "Esta casilla" : "";
+    const assigneeTitle = disabled
+      ? `${assignedOutside.collaboratorName} - ${assignedOutside.dayName}`
+      : assignedHere
+      ? "Asignada en esta casilla"
+      : "";
 
-  setSelectOptions(
-    taskItem,
-    [{ value: "", label: "Seleccionar tarea" }, ...options],
-    selectedTaskId
-  );
-  taskItem.disabled = false;
-  updateTaskHint(team, taskItem.value);
+    return `
+      <label class="${itemClasses}" title="${escapeHtml(assigneeTitle)}">
+        <input
+          type="checkbox"
+          value="${escapeHtml(task.id)}"
+          ${checked ? "checked" : ""}
+          ${disabled ? "disabled" : ""}
+        >
+        <span>${legend.symbol}</span>
+        <span class="checklist-name">${escapeHtml(task.name)}</span>
+        <span class="checklist-assignee">${escapeHtml(assignee)}</span>
+        <span class="checklist-freq">${escapeHtml(legend.short)}</span>
+      </label>
+    `;
+  }).join("");
 }
 
-function updateTaskHint(team, taskId) {
-  if (!team || !taskId) {
-    taskFrequencyHint.textContent = "Selecciona equipo y tarea para ver la frecuencia del sharp.";
+function chooseInitialEditorTeam() {
+  if (!selectedCell) {
+    return TEAM_NAMES[0] || "";
+  }
+
+  const currentItems = getCellItems(getSelectedCellKey());
+  const firstKnownTeam = currentItems.find((item) => hasTeam(item.team));
+
+  if (firstKnownTeam) {
+    return firstKnownTeam.team;
+  }
+
+  if (hasTeam(selectedEditorTeam)) {
+    return selectedEditorTeam;
+  }
+
+  return TEAM_NAMES[0] || "";
+}
+
+function validateSelectedCell() {
+  if (!selectedCell) {
     return;
   }
 
-  const task = findTask(team, taskId);
-  if (!task) {
-    taskFrequencyHint.textContent = "No se encontro la tarea seleccionada.";
+  const collaboratorExists = state.collaborators.some((item) => item.id === selectedCell.collaboratorId);
+  const dayExists = selectedCell.dayIndex >= 0 && selectedCell.dayIndex < DAYS.length;
+
+  if (!collaboratorExists || !dayExists) {
+    selectedCell = null;
+    closeTaskEditor();
+  }
+}
+
+function collectAssignmentsByTask() {
+  const assignmentsByTask = new Map();
+  const collaboratorsById = new Map(state.collaborators.map((item) => [item.id, item]));
+
+  for (const [cellKey, assignment] of Object.entries(state.tasks)) {
+    const parsedKey = parseCellKey(cellKey);
+    const collaborator = collaboratorsById.get(parsedKey.collaboratorId);
+    if (!collaborator) {
+      continue;
+    }
+
+    for (const item of getAssignmentItems(assignment)) {
+      if (!item.team || !item.taskId) {
+        continue;
+      }
+
+      const lockKey = buildTaskLockKey(item.team, item.taskId);
+      const list = assignmentsByTask.get(lockKey) || [];
+      list.push({
+        cellKey,
+        collaboratorId: collaborator.id,
+        collaboratorName: collaborator.name,
+        dayIndex: parsedKey.dayIndex,
+        dayName: DAYS[parsedKey.dayIndex] || "",
+        team: item.team,
+        taskId: item.taskId
+      });
+      assignmentsByTask.set(lockKey, list);
+    }
+  }
+
+  return assignmentsByTask;
+}
+
+function getSelectedCellKey() {
+  return buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+}
+
+function getCellItems(cellKey) {
+  return getAssignmentItems(state.tasks[cellKey]);
+}
+
+function getAssignmentItems(assignment) {
+  if (!assignment || typeof assignment !== "object" || assignment.free) {
+    return [];
+  }
+
+  if (Array.isArray(assignment.items)) {
+    return assignment.items;
+  }
+
+  if (assignment.team || assignment.taskId || assignment.text) {
+    return [assignment];
+  }
+
+  return [];
+}
+
+function setCellItems(cellKey, items) {
+  const normalizedItems = dedupeAssignmentItems(items);
+
+  if (normalizedItems.length === 0) {
+    delete state.tasks[cellKey];
     return;
   }
 
-  const legend = LEGEND[task.color] || LEGEND.none;
-  taskFrequencyHint.textContent = `${legend.symbol} ${task.name}: ${legend.label}`;
+  state.tasks[cellKey] = { items: normalizedItems };
 }
 
-function collectTeamsFromState() {
-  const knownTeams = new Set(TEAM_NAMES);
-  const extraTeams = [];
+function dedupeAssignmentItems(items) {
+  const unique = [];
+  const seen = new Set();
 
-  for (const assignment of Object.values(state.tasks)) {
-    if (!assignment || typeof assignment.team !== "string") {
+  for (const item of items) {
+    const normalized = normalizeTaskItem(item);
+    if (!normalized) {
       continue;
     }
-    const team = assignment.team.trim();
-    if (!team || knownTeams.has(team)) {
+
+    const key = normalized.taskId
+      ? buildTaskLockKey(normalized.team, normalized.taskId)
+      : `${normalized.team}__${normalizeText(normalized.text)}`;
+    if (seen.has(key)) {
       continue;
     }
-    knownTeams.add(team);
-    extraTeams.push(team);
+
+    seen.add(key);
+    unique.push(normalized);
   }
 
-  return [...TEAM_NAMES, ...extraTeams];
+  return unique;
 }
 
-function setSelectOptions(selectElement, options, currentValue) {
-  const selectedValue = options.some((option) => option.value === currentValue)
-    ? currentValue
-    : options[0].value;
-
-  selectElement.innerHTML = "";
-  for (const option of options) {
-    const optionElement = document.createElement("option");
-    optionElement.value = option.value;
-    optionElement.textContent = option.label;
-    selectElement.append(optionElement);
-  }
-  selectElement.value = selectedValue;
+function findCollaborator(collaboratorId) {
+  return state.collaborators.find((item) => item.id === collaboratorId) || null;
 }
 
-function resolveTaskMeta(assignment) {
-  const team = assignment.team && assignment.team.trim() ? assignment.team.trim() : "Sin equipo";
-  const task = findTask(team, assignment.taskId);
+function resolveTaskMeta(item) {
+  const team = item.team && item.team.trim() ? item.team.trim() : "Sin equipo";
+  const task = findTask(team, item.taskId);
 
   if (task) {
     const legend = LEGEND[task.color] || LEGEND.none;
@@ -902,10 +963,10 @@ function resolveTaskMeta(assignment) {
     };
   }
 
-  const fallbackText = assignment.text && assignment.text.trim()
-    ? assignment.text.trim()
+  const fallbackText = item.text && item.text.trim()
+    ? item.text.trim()
     : "Tarea sin catalogo";
-  const colorKey = LEGEND[assignment.colorKey] ? assignment.colorKey : "none";
+  const colorKey = LEGEND[item.colorKey] ? item.colorKey : "none";
   return {
     team,
     taskName: fallbackText,
@@ -917,7 +978,7 @@ function findTask(team, taskId) {
   if (!team || !taskId) {
     return null;
   }
-  return TASK_INDEX.get(`${team}__${taskId}`) || null;
+  return TASK_INDEX.get(buildTaskLockKey(team, taskId)) || null;
 }
 
 function findTaskIdByText(team, text) {
@@ -945,7 +1006,7 @@ function findTaskIdByText(team, text) {
 }
 
 function normalizeText(value) {
-  return value
+  return String(value)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -961,14 +1022,41 @@ function buildTaskIndex() {
   const map = new Map();
   for (const [team, tasks] of Object.entries(TASK_LIBRARY)) {
     for (const task of tasks) {
-      map.set(`${team}__${task.id}`, task);
+      map.set(buildTaskLockKey(team, task.id), task);
     }
   }
   return map;
 }
 
+function buildTaskLockKey(team, taskId) {
+  return `${team}__${taskId}`;
+}
+
 function buildCellKey(collaboratorId, dayIndex) {
   return `${collaboratorId}__${dayIndex}`;
+}
+
+function parseCellKey(cellKey) {
+  const [collaboratorId = "", dayValue = ""] = String(cellKey).split("__");
+  return {
+    collaboratorId,
+    dayIndex: Number(dayValue)
+  };
+}
+
+function setSelectOptions(selectElement, options, currentValue) {
+  const selectedValue = options.some((option) => option.value === currentValue)
+    ? currentValue
+    : options[0]?.value || "";
+
+  selectElement.innerHTML = "";
+  for (const option of options) {
+    const optionElement = document.createElement("option");
+    optionElement.value = option.value;
+    optionElement.textContent = option.label;
+    selectElement.append(optionElement);
+  }
+  selectElement.value = selectedValue;
 }
 
 function trimText(value, maxLength) {
