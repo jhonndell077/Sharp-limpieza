@@ -488,11 +488,12 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.5;
-  text-decoration: line-through;
 }
 
-/* Done chips get additional fade to distinguish completed from just-assigned */
-.task-chip.chip-done { opacity: 0.38; }
+.task-chip.chip-done {
+  text-decoration: line-through;
+  opacity: 0.38;
+}
 
 .task-empty {
   font-size: 0.75rem;
