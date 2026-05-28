@@ -328,7 +328,9 @@ modalTaskList.addEventListener("change", (event) => {
 
 modalTaskList.addEventListener("click", (event) => {
   const btn = event.target.closest("[data-remove-task]");
-  if (btn) removeTask(Number(btn.dataset.removeTask));
+  if (btn) {
+    requireAdmin("Eliminar tarea", () => removeTask(Number(btn.dataset.removeTask)));
+  }
 });
 
 clearTaskButton.addEventListener("click", () => {
