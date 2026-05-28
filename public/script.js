@@ -4,7 +4,7 @@ const REMOTE_BOARD_PATH = "boards/main";
 const SYNC_DEBOUNCE_MS = 250;
 
 // Paste here the URL of your deployed Google Apps Script web app
-const APPS_SCRIPT_URL = "";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby9BaKj7ioy1x8ffJJ0-ku6ERo4pPSQ37PPE0GhOdXwu1eGEmGt6VsEPtKRfD-pFgnB9A/exec";
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDvx6sjsvCEOiKQT6fbyx1SF7wuogZfOHI",
