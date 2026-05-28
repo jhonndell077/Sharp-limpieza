@@ -477,17 +477,15 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
 
 .task-chip {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   background: rgba(0,0,0,0.08);
   border-radius: 4px;
   padding: 0.08rem 0.26rem;
   font-size: 0.68rem;
   font-weight: 700;
-  white-space: nowrap;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.5;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .task-chip.chip-done {
