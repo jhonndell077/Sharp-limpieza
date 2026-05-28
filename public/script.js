@@ -165,7 +165,7 @@ let remoteSaveTimer = null;
 let isApplyingRemoteState = false;
 let hasRemoteSnapshot = false;
 
-const FACE_MODELS_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
+const FACE_MODELS_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model";
 const FACE_THRESHOLD  = 0.50;
 let faceModelsReady   = false;
 let faceModelsPromise = null;
@@ -350,7 +350,7 @@ async function loadFaceModels() {
     if (typeof faceapi === "undefined") {
       const loaded = await new Promise((resolve) => {
         const s = document.createElement("script");
-        s.src     = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
+        s.src     = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js";
         s.onload  = () => resolve(true);
         s.onerror = () => resolve(false);
         document.head.appendChild(s);
@@ -386,16 +386,10 @@ async function openFaceModal(mode, collaboratorId) {
   faceActionBtn.disabled      = true;
   faceMsg.textContent         = "";
   faceMsg.className           = "face-msg";
-  faceStatusText.textContent  = "Cargando modelos de IA...";
+  faceStatusText.textContent  = "Iniciando cámara...";
   faceModalOverlay.classList.remove("hidden");
 
-  const modelsOk = await loadFaceModels();
-  if (!modelsOk) {
-    faceStatusText.textContent = "Error al cargar los modelos. Verifica tu conexión.";
-    return new Promise((resolve) => { faceModalResolve = resolve; });
-  }
-
-  faceStatusText.textContent = "Activando cámara...";
+  // Arrancar cámara PRIMERO (el usuario se ve mientras cargan modelos)
   try {
     faceStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
@@ -408,6 +402,14 @@ async function openFaceModal(mode, collaboratorId) {
     faceVideo.play();
   } catch (_) {
     faceStatusText.textContent = "No se pudo acceder a la cámara. Verifica los permisos del navegador.";
+    return new Promise((resolve) => { faceModalResolve = resolve; });
+  }
+
+  // Cargar modelos mientras el usuario ya se ve en la cámara
+  faceStatusText.textContent = "Cargando modelos de IA... (primera vez puede tardar)";
+  const modelsOk = await loadFaceModels();
+  if (!modelsOk) {
+    faceStatusText.textContent = "Error al cargar los modelos. Verifica tu conexión e intenta de nuevo.";
     return new Promise((resolve) => { faceModalResolve = resolve; });
   }
 
