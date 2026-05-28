@@ -1,4 +1,4 @@
-const DAYS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes"];
+const DAYS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
 const STORAGE_KEY = "sharp_limpieza_board_v2";
 const LEGACY_STORAGE_KEY = "sharp_limpieza_board_v1";
 const REMOTE_BOARD_PATH = "boards/main";
@@ -615,7 +615,7 @@ function renderTable() {
         : "Sin tarea";
 
       return `
-        <td class="task-cell">
+        <td class="task-cell" data-day-label="${escapeHtml(DAYS[dayIndex])}">
           <button
             type="button"
             class="cell-btn ${statusClass} ${selectedClass}"

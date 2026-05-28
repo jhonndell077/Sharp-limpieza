@@ -24,6 +24,13 @@ body {
   min-height: 100vh;
 }
 
+body,
+main,
+section,
+aside {
+  min-width: 0;
+}
+
 .app-header {
   padding: 1.25rem 1rem;
   background: linear-gradient(120deg, #6aa84f, #4e8137);
@@ -38,6 +45,8 @@ body {
 .app-header p {
   margin: 0.3rem 0 0;
   opacity: 0.95;
+  max-width: 100%;
+  overflow-wrap: break-word;
 }
 
 .sync-status {
@@ -76,6 +85,10 @@ body {
   grid-template-columns: minmax(0, 2.2fr) minmax(320px, 1fr);
   gap: 1rem;
   padding: 1rem;
+}
+
+.layout > * {
+  min-width: 0;
 }
 
 .board-section,
@@ -154,7 +167,8 @@ button.secondary {
 table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 740px;
+  min-width: 0;
+  table-layout: fixed;
 }
 
 th,
@@ -176,10 +190,11 @@ thead th {
 .header-colaboradores {
   background: #f2db3f;
   color: #94430d;
+  width: 124px;
 }
 
 td.row-name {
-  width: 138px;
+  width: 124px;
   background: #f7f9f6;
   font-weight: 600;
 }
@@ -204,7 +219,6 @@ td.row-name {
 }
 
 td.task-cell {
-  width: 145px;
   height: 84px;
 }
 
@@ -414,5 +428,159 @@ td.task-cell {
 @media (max-width: 1080px) {
   .layout {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .app-header {
+    padding: 1rem;
+  }
+
+  .layout {
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .board-section,
+  .card {
+    border-radius: 8px;
+  }
+
+  .table-wrap {
+    overflow-x: visible;
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  table {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 0.8rem;
+  }
+
+  tbody tr {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  th,
+  td,
+  td.row-name,
+  td.task-cell {
+    border: 0;
+  }
+
+  td.row-name {
+    width: 100%;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .row-name .name-wrap {
+    padding: 0.7rem 0.75rem;
+  }
+
+  td.task-cell {
+    display: grid;
+    grid-template-columns: 86px minmax(0, 1fr);
+    align-items: stretch;
+    height: auto;
+    min-height: 72px;
+    border-bottom: 1px solid #e2e8df;
+  }
+
+  td.task-cell:last-child {
+    border-bottom: 0;
+  }
+
+  td.task-cell::before {
+    content: attr(data-day-label);
+    display: flex;
+    align-items: center;
+    padding: 0.65rem 0.7rem;
+    background: #edf4e9;
+    color: #365929;
+    font-weight: 800;
+    text-align: left;
+  }
+
+  .cell-btn {
+    min-height: 72px;
+    border-radius: 0;
+    padding: 0.55rem 0.65rem;
+    text-align: left;
+  }
+
+  .cell-btn.selected {
+    box-shadow: inset 0 0 0 2px #6eac4f;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .app-header p {
+    max-width: 20rem;
+    font-size: 0.94rem;
+    line-height: 1.35;
+  }
+
+  .toolbar,
+  .input-row,
+  .action-row {
+    display: grid;
+    width: 100%;
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .toolbar form,
+  .toolbar button,
+  .input-row input,
+  .input-row button,
+  .action-row button {
+    width: 100%;
+  }
+
+  .card,
+  .board-section {
+    padding: 0.75rem;
+  }
+
+  td.task-cell {
+    grid-template-columns: 78px minmax(0, 1fr);
+  }
+
+  td.task-cell::before {
+    padding: 0.55rem;
+    font-size: 0.86rem;
+  }
+
+  .cell-btn .task-preview {
+    font-size: 0.8rem;
+  }
+
+  .cell-btn .status-preview {
+    font-size: 0.7rem;
   }
 }
