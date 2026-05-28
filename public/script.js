@@ -540,7 +540,8 @@ function rebuildLibraryDerived() {
 
 function saveLibraryToFirebase() {
   if (!libraryRef) return;
-  libraryRef.set(JSON.stringify(TASK_LIBRARY));
+  libraryRef.set(JSON.stringify(TASK_LIBRARY))
+    .catch((err) => console.error("Error guardando biblioteca:", err));
 }
 
 function initLibrarySync() {

@@ -8,6 +8,11 @@
         ".write": true,
         ".validate": "newData.hasChildren(['stateJson']) && newData.child('stateJson').isString()"
       }
+    },
+    "library": {
+      ".read": true,
+      ".write": true,
+      ".validate": "newData.isString()"
     }
   }
 }
