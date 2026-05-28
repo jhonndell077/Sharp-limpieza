@@ -586,6 +586,22 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
   padding: 0 0.5rem;
 }
 
+/* Tarea realizada bloqueada */
+.task-check-locked { cursor: default; opacity: 0.85; }
+.task-check-locked input[type="checkbox"] { cursor: not-allowed; }
+
+.task-done-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #2a7a2a;
+  background: #e0f3e0;
+  border: 1px solid #8bcb8b;
+  border-radius: 20px;
+  padding: 0.1rem 0.45rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Thumbnail de evidencia en lista de tareas */
 .task-evidence-thumb {
   width: 48px;

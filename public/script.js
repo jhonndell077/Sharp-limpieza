@@ -467,12 +467,16 @@ function renderModalTaskList() {
            <img src="${escapeHtml(item.evidencePhotoUrl)}" class="task-evidence-thumb" alt="Evidencia" loading="lazy">
          </a>`
       : "";
+    const lockBadge = item.done
+      ? `<span class="task-done-badge" title="Tarea realizada — no puede desmarcarse">🔒 Realizada</span>`
+      : "";
     return `
       <div class="modal-task-item ${doneClass}">
-        <label class="modal-task-check">
-          <input type="checkbox" ${item.done ? "checked" : ""} data-toggle-done="${index}">
+        <label class="modal-task-check ${item.done ? "task-check-locked" : ""}">
+          <input type="checkbox" ${item.done ? "checked disabled" : ""} data-toggle-done="${index}">
           <span>${meta.legend.symbol} <strong>${escapeHtml(meta.taskName)}</strong> — ${escapeHtml(meta.team)}</span>
         </label>
+        ${lockBadge}
         ${thumbHtml}
         <button type="button" class="modal-task-remove" data-remove-task="${index}" title="Eliminar">✕</button>
       </div>
@@ -486,6 +490,13 @@ async function toggleTaskDone(index, done) {
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
   const cellData = state.tasks[key];
   if (!cellData || !Array.isArray(cellData.items) || !cellData.items[index]) return;
+
+  // Una vez marcada, la tarea no puede desmarcarse
+  if (!done && cellData.items[index].done) {
+    const cb = modalTaskList.querySelector(`[data-toggle-done="${index}"]`);
+    if (cb) cb.checked = true;
+    return;
+  }
 
   if (done) {
     const meta = resolveTaskMeta(cellData.items[index]);
