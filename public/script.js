@@ -171,7 +171,6 @@ const taskItem = document.getElementById("task-item");
 const taskFree = document.getElementById("task-free");
 const taskDone = document.getElementById("task-done");
 const taskFrequencyHint = document.getElementById("task-frequency-hint");
-const loadExampleButton = document.getElementById("load-example");
 const clearTaskButton = document.getElementById("clear-task");
 const syncStatus = document.getElementById("sync-status");
 const modalOverlay = document.getElementById("cell-modal-overlay");
@@ -310,16 +309,6 @@ modalOverlay.addEventListener("click", (event) => {
   if (event.target === modalOverlay) closeModal();
 });
 
-loadExampleButton.addEventListener("click", () => {
-  const ok = window.confirm("Esto reemplazara la data actual. Quieres continuar?");
-  if (!ok) return;
-  state = createExampleState();
-  selectedCell = null;
-  closeModal();
-  saveState();
-  updateTeamSelectors();
-  renderTable();
-});
 
 function openModal() {
   if (!selectedCell) return;
