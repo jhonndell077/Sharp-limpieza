@@ -147,12 +147,32 @@ const modalCloseBtn     = document.getElementById("modal-close-btn");
 const modalCancelBtn    = document.getElementById("modal-cancel-btn");
 const modalTaskList     = document.getElementById("modal-task-list");
 
+// Face ID DOM refs
+const faceModalOverlay  = document.getElementById("face-modal-overlay");
+const faceModalKicker   = document.getElementById("face-modal-kicker");
+const faceModalLabel    = document.getElementById("face-modal-label");
+const faceModalCloseBtn = document.getElementById("face-modal-close-btn");
+const faceCancelBtn     = document.getElementById("face-cancel-btn");
+const faceActionBtn     = document.getElementById("face-action-btn");
+const faceVideo         = document.getElementById("face-video");
+const faceMsg           = document.getElementById("face-msg");
+const faceStatusText    = document.getElementById("face-status-text");
+
 let state = loadState() || createInitialState();
 let selectedCell = null;
 let remoteBoardRef = null;
 let remoteSaveTimer = null;
 let isApplyingRemoteState = false;
 let hasRemoteSnapshot = false;
+
+const FACE_MODELS_URL  = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
+const FACE_THRESHOLD   = 0.50;
+let faceModelsReady    = false;
+let faceModelsPromise  = null;
+let faceStream         = null;
+let faceModalMode      = null;
+let faceModalCollabId  = null;
+let faceModalResolve   = null;
 
 updateTeamSelectors();
 renderTable();
@@ -163,18 +183,21 @@ if (weekRangeEl) weekRangeEl.textContent = getCurrentWeekLabel();
 
 // ── Event listeners ──────────────────────────────────────────────────
 
-collaboratorForm.addEventListener("submit", (event) => {
+collaboratorForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const name = collaboratorInput.value.trim();
   if (!name) { collaboratorInput.focus(); return; }
-  state.collaborators.push({ id: createId(), name });
+  const newId = createId();
+  state.collaborators.push({ id: newId, name, faceDescriptor: null });
   collaboratorInput.value = "";
   saveState();
   updateTeamSelectors();
   renderTable();
+  await openFaceModal("register", newId);
+  renderTable();
 });
 
-scheduleBody.addEventListener("click", (event) => {
+scheduleBody.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
 
@@ -190,6 +213,14 @@ scheduleBody.addEventListener("click", (event) => {
     }
     if (selectedCell && selectedCell.collaboratorId === cid) closeModal();
     saveState();
+    renderTable();
+    return;
+  }
+
+  const faceBtn = target.closest("[data-register-face]");
+  if (faceBtn) {
+    const cid = faceBtn.getAttribute("data-register-face");
+    await openFaceModal("register", cid);
     renderTable();
     return;
   }
@@ -310,6 +341,157 @@ function closeModal() {
   renderTable();
 }
 
+// ── Face ID ────────────────────────────────────────────────
+
+async function loadFaceModels() {
+  if (faceModelsReady) return true;
+  if (faceModelsPromise) return faceModelsPromise;
+  faceModelsPromise = (async () => {
+    if (typeof faceapi === "undefined") {
+      const loaded = await new Promise((resolve) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
+        s.onload  = () => resolve(true);
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
+      });
+      if (!loaded || typeof faceapi === "undefined") return false;
+    }
+    try {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODELS_URL),
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODELS_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS_URL)
+      ]);
+      faceModelsReady = true;
+      return true;
+    } catch (err) {
+      console.error("face models error", err);
+      faceModelsPromise = null;
+      return false;
+    }
+  })();
+  return faceModelsPromise;
+}
+
+async function openFaceModal(mode, collaboratorId) {
+  faceModalMode     = mode;
+  faceModalCollabId = collaboratorId;
+  const collaborator = state.collaborators.find((c) => c.id === collaboratorId);
+  if (!collaborator) return false;
+
+  faceModalKicker.textContent = mode === "register" ? "Registro de Face ID" : "Verificación de identidad";
+  faceModalLabel.textContent  = collaborator.name;
+  faceActionBtn.textContent   = mode === "register" ? "Capturar rostro" : "Verificar";
+  faceActionBtn.disabled      = true;
+  faceMsg.textContent         = "";
+  faceMsg.className           = "face-msg";
+  faceStatusText.textContent  = "Cargando modelos de IA...";
+  faceModalOverlay.classList.remove("hidden");
+
+  const modelsOk = await loadFaceModels();
+  if (!modelsOk) {
+    faceStatusText.textContent = "Error al cargar los modelos de IA. Verifica tu conexión.";
+    return new Promise((resolve) => { faceModalResolve = resolve; });
+  }
+
+  faceStatusText.textContent = "Activando cámara...";
+  try {
+    faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+    faceVideo.srcObject = faceStream;
+    await new Promise((resolve, reject) => {
+      faceVideo.onloadedmetadata = resolve;
+      setTimeout(reject, 8000);
+    });
+    faceVideo.play();
+  } catch (_) {
+    faceStatusText.textContent = "No se pudo acceder a la cámara. Verifica los permisos del navegador.";
+    return new Promise((resolve) => { faceModalResolve = resolve; });
+  }
+
+  faceStatusText.textContent = mode === "register"
+    ? "Coloca tu rostro frente a la cámara y presiona Capturar rostro."
+    : "Coloca tu rostro frente a la cámara y presiona Verificar.";
+  faceActionBtn.disabled = false;
+
+  return new Promise((resolve) => { faceModalResolve = resolve; });
+}
+
+faceActionBtn.addEventListener("click", async () => {
+  faceActionBtn.disabled = true;
+  faceMsg.textContent    = "Detectando...";
+  faceMsg.className      = "face-msg";
+
+  let detection;
+  try {
+    detection = await faceapi
+      .detectSingleFace(faceVideo, new faceapi.TinyFaceDetectorOptions({ inputSize: 320 }))
+      .withFaceLandmarks(true)
+      .withFaceDescriptor();
+  } catch (err) {
+    faceMsg.textContent   = "Error al detectar. Intenta de nuevo.";
+    faceMsg.className     = "face-msg error";
+    faceActionBtn.disabled = false;
+    return;
+  }
+
+  if (!detection) {
+    faceMsg.textContent        = "No se detectó ningún rostro.";
+    faceMsg.className          = "face-msg error";
+    faceStatusText.textContent = "Asegúrate de que tu rostro esté bien iluminado y centrado.";
+    faceActionBtn.disabled     = false;
+    return;
+  }
+
+  const descriptor = Array.from(detection.descriptor);
+
+  if (faceModalMode === "register") {
+    const collaborator = state.collaborators.find((c) => c.id === faceModalCollabId);
+    if (collaborator) {
+      collaborator.faceDescriptor = descriptor;
+      saveState();
+    }
+    faceMsg.textContent        = "✓ Rostro registrado";
+    faceMsg.className          = "face-msg success";
+    faceStatusText.textContent = "Face ID guardado correctamente.";
+    setTimeout(() => closeFaceModal(true), 1100);
+  } else {
+    const collaborator = state.collaborators.find((c) => c.id === faceModalCollabId);
+    if (!collaborator || !Array.isArray(collaborator.faceDescriptor)) {
+      closeFaceModal(true);
+      return;
+    }
+    const distance = faceapi.euclideanDistance(descriptor, collaborator.faceDescriptor);
+    if (distance <= FACE_THRESHOLD) {
+      faceMsg.textContent        = "✓ Identidad verificada";
+      faceMsg.className          = "face-msg success";
+      faceStatusText.textContent = "Coincidencia confirmada.";
+      setTimeout(() => closeFaceModal(true), 900);
+    } else {
+      faceMsg.textContent        = "✗ Rostro no reconocido";
+      faceMsg.className          = "face-msg error";
+      faceStatusText.textContent = "El rostro no coincide con el registrado. Intenta de nuevo.";
+      faceActionBtn.disabled     = false;
+    }
+  }
+});
+
+faceModalCloseBtn.addEventListener("click", () => closeFaceModal(false));
+faceCancelBtn.addEventListener("click",     () => closeFaceModal(false));
+
+function closeFaceModal(success) {
+  if (faceStream) {
+    faceStream.getTracks().forEach((t) => t.stop());
+    faceStream = null;
+  }
+  faceVideo.srcObject = null;
+  faceModalOverlay.classList.add("hidden");
+  if (faceModalResolve) {
+    faceModalResolve(success);
+    faceModalResolve = null;
+  }
+}
+
 function renderModalTaskList() {
   if (!selectedCell) return;
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
@@ -337,8 +519,21 @@ function renderModalTaskList() {
   }).join("");
 }
 
-function toggleTaskDone(index, done) {
+async function toggleTaskDone(index, done) {
   if (!selectedCell) return;
+
+  if (done) {
+    const collaborator = state.collaborators.find((c) => c.id === selectedCell.collaboratorId);
+    if (collaborator && Array.isArray(collaborator.faceDescriptor)) {
+      const verified = await openFaceModal("verify", selectedCell.collaboratorId);
+      if (!verified) {
+        const cb = modalTaskList.querySelector(`[data-toggle-done="${index}"]`);
+        if (cb) cb.checked = false;
+        return;
+      }
+    }
+  }
+
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
   const cellData = state.tasks[key];
   if (!cellData || !Array.isArray(cellData.items) || !cellData.items[index]) return;
@@ -442,7 +637,11 @@ function normalizeState(parsed) {
 
   const collaborators = parsed.collaborators
     .filter((c) => c && typeof c.id === "string" && typeof c.name === "string")
-    .map((c) => ({ id: c.id, name: c.name.trim() }))
+    .map((c) => ({
+      id: c.id,
+      name: c.name.trim(),
+      faceDescriptor: Array.isArray(c.faceDescriptor) ? c.faceDescriptor : null
+    }))
     .filter((c) => c.name.length > 0);
 
   const sourceTasks = parsed.tasks && typeof parsed.tasks === "object" ? parsed.tasks : {};
@@ -635,6 +834,11 @@ function renderTable() {
         <td class="row-name">
           <div class="name-wrap">
             <span>${escapeHtml(collaborator.name)}</span>
+            <button type="button"
+              class="face-id-btn ${collaborator.faceDescriptor ? 'face-registered' : ''}"
+              data-register-face="${collaborator.id}"
+              title="${collaborator.faceDescriptor ? 'Face ID activo — clic para actualizar' : 'Registrar Face ID'}"
+              aria-label="Face ID ${escapeHtml(collaborator.name)}">${collaborator.faceDescriptor ? '🔐' : '📷'}</button>
             <button type="button" class="remove-btn"
               data-remove-collaborator="${collaborator.id}"
               title="Eliminar colaborador"

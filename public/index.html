@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=6">
+  <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
   <header class="app-header">
@@ -46,6 +46,31 @@
       </div>
     </section>
   </main>
+
+  <!-- Modal de Face ID -->
+  <div id="face-modal-overlay" class="modal-overlay face-modal-overlay hidden">
+    <div class="modal-card face-modal-card">
+      <div class="modal-head">
+        <div>
+          <span class="modal-kicker" id="face-modal-kicker">Face ID</span>
+          <strong id="face-modal-label">-</strong>
+        </div>
+        <button type="button" id="face-modal-close-btn" class="modal-close-btn">✕</button>
+      </div>
+      <div class="face-modal-body">
+        <div class="camera-wrap">
+          <video id="face-video" autoplay muted playsinline></video>
+          <div class="face-guide-ring"></div>
+          <div id="face-msg" class="face-msg"></div>
+        </div>
+        <p id="face-status-text" class="face-status-text"></p>
+      </div>
+      <div class="modal-foot">
+        <button type="button" id="face-action-btn" disabled>Capturar rostro</button>
+        <button type="button" id="face-cancel-btn" class="secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal flotante -->
   <div id="cell-modal-overlay" class="modal-overlay hidden">
@@ -94,6 +119,6 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=6"></script>
+  <script src="script.js?v=7"></script>
 </body>
 </html>
