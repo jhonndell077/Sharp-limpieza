@@ -558,6 +558,7 @@ function initLibrarySync() {
         for (const task of tasks) TASK_INDEX.set(`${team}__${task.id}`, task);
       }
       updateTeamSelectors();
+      renderTable(); // re-render chips with proper task names now that library loaded
       if (!modalOverlay.classList.contains("hidden")) {
         renderTaskChecklist(taskTeam.value);
       }
@@ -986,7 +987,9 @@ function normalizeTaskItem(value) {
   const evidencePhotoUrl = typeof value.evidencePhotoUrl === "string" ? value.evidencePhotoUrl : undefined;
   const extra = { ...(completedAt ? { completedAt } : {}), ...(evidencePhotoUrl ? { evidencePhotoUrl } : {}) };
 
-  if (taskId && findTask(team, taskId)) return { id, team, taskId, done, ...extra };
+  // Keep item if it has a taskId, even if not yet found in TASK_LIBRARY
+  // (library may load after board state; resolveTaskMeta handles missing tasks gracefully)
+  if (taskId) return { id, team, taskId, done, ...extra };
   if (text) return { id, team, taskId: "", text, colorKey: LEGEND[colorKey] ? colorKey : "none", done, ...extra };
   return null;
 }
@@ -1017,10 +1020,18 @@ function initRemoteSync() {
 
     remoteBoardRef.on("value", (snap) => {
       hasRemoteSnapshot = true;
-      const remoteState = parseRemoteState(snap.val());
-      if (!remoteState) {
+      const raw = snap.val();
+      if (raw === null) {
+        // No data in Firebase yet — upload current local state
         setSyncStatus("Subiendo datos iniciales...", "busy");
         queueRemoteSave({ immediate: true });
+        return;
+      }
+      const remoteState = parseRemoteState(raw);
+      if (!remoteState) {
+        // Data exists but couldn't be parsed — do NOT overwrite with empty state
+        console.warn("No se pudo interpretar el estado remoto:", raw);
+        setSyncStatus("Error de formato", "error");
         return;
       }
       isApplyingRemoteState = true;
