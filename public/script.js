@@ -588,7 +588,7 @@ function renderTable() {
         cellContent = items.map((item) => {
           const meta = resolveTaskMeta(item);
           const chipDone = item.done ? "chip-done" : "";
-          return `<span class="task-chip ${chipDone}">${meta.legend.symbol} ${escapeHtml(trimText(meta.taskName, 20))}</span>`;
+          return `<span class="task-chip ${chipDone}">${meta.legend.symbol} ${escapeHtml(trimText(meta.taskName, 16))} · ${escapeHtml(trimText(meta.team, 14))}</span>`;
         }).join("");
       } else {
         cellContent = `<span class="task-empty">+ Asignar tarea</span>`;
