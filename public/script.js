@@ -158,6 +158,9 @@ updateTeamSelectors();
 renderTable();
 initRemoteSync();
 
+const weekRangeEl = document.getElementById("week-range");
+if (weekRangeEl) weekRangeEl.textContent = getCurrentWeekLabel();
+
 // ── Event listeners ──────────────────────────────────────────────────
 
 collaboratorForm.addEventListener("submit", (event) => {
@@ -376,14 +379,18 @@ function renderTaskChecklist(team) {
   const tasks = TASK_LIBRARY[team] || [];
   taskChecklist.innerHTML = tasks.map((task) => {
     const legend = LEGEND[task.color] || LEGEND.none;
-    const assigned = isTaskAssigned(team, task.id);
-    const assignedClass = assigned ? "checklist-item-assigned" : "";
-    const disabledAttr = assigned ? "disabled checked" : "";
+    const assignee = getTaskAssignee(team, task.id);
+    const assignedClass = assignee ? "checklist-item-assigned" : "";
+    const disabledAttr = assignee ? "disabled checked" : "";
+    const assigneeLabel = assignee
+      ? `<span class="checklist-assignee">${escapeHtml(assignee)}</span>`
+      : "";
     return `
       <label class="checklist-item ${assignedClass}">
         <input type="checkbox" value="${task.id}" ${disabledAttr}>
         <span>${legend.symbol}</span>
         <span class="checklist-name">${escapeHtml(task.name)}</span>
+        ${assigneeLabel}
         <span class="checklist-freq">${escapeHtml(legend.short)}</span>
       </label>`;
   }).join("");
@@ -392,11 +399,21 @@ function renderTaskChecklist(team) {
 }
 
 function isTaskAssigned(team, taskId) {
-  if (!selectedCell) return false;
-  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-  const cellData = state.tasks[key];
-  if (!cellData || !Array.isArray(cellData.items)) return false;
-  return cellData.items.some((item) => item.team === team && item.taskId === taskId);
+  return getTaskAssignee(team, taskId) !== null;
+}
+
+function getTaskAssignee(team, taskId) {
+  if (!selectedCell) return null;
+  const { dayIndex } = selectedCell;
+  for (const collaborator of state.collaborators) {
+    const key = buildCellKey(collaborator.id, dayIndex);
+    const cellData = state.tasks[key];
+    if (!cellData || !Array.isArray(cellData.items)) continue;
+    if (cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
+      return collaborator.name;
+    }
+  }
+  return null;
 }
 
 // ── State ─────────────────────────────────────────────────────────────
@@ -723,6 +740,24 @@ function createId() {
   return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : `id_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
+function getCurrentWeekLabel() {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = (d) => {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${dd}/${mm}/${yy}`;
+  };
+  return `Del ${fmt(monday)} Hasta ${fmt(sunday)}`;
 }
 
 function escapeHtml(value) {
