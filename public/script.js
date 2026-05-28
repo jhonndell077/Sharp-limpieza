@@ -1,6 +1,5 @@
 const DAYS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
-const STORAGE_KEY = "sharp_limpieza_board_v2";
-const LEGACY_STORAGE_KEY = "sharp_limpieza_board_v1";
+const STORAGE_KEY = "sharp_limpieza_board_v3";
 const REMOTE_BOARD_PATH = "boards/main";
 const SYNC_DEBOUNCE_MS = 250;
 
@@ -15,144 +14,114 @@ const FIREBASE_CONFIG = {
 };
 
 const LEGEND = {
-  red: {
-    symbol: "🟥",
-    label: "Debe ser cada 1 dia",
-    short: "Cada 1 dia",
-    css: "lg-red"
-  },
-  orange: {
-    symbol: "🟧",
-    label: "Debe ser cada 3 dias",
-    short: "Cada 3 dias",
-    css: "lg-orange"
-  },
-  yellow: {
-    symbol: "🟨",
-    label: "Puede ser cada 4 dias",
-    short: "Cada 4 dias",
-    css: "lg-yellow"
-  },
-  green: {
-    symbol: "🟩",
-    label: "Puede ser una semana (mas trabajo)",
-    short: "Semanal (mas trabajo)",
-    css: "lg-green"
-  },
-  purple: {
-    symbol: "🟪",
-    label: "Puede ser una semana (+)",
-    short: "Semanal (+)",
-    css: "lg-purple"
-  },
-  none: {
-    symbol: "⚪",
-    label: "Sin color definido en PDF",
-    short: "Sin color",
-    css: "lg-none"
-  }
+  red:    { symbol: "🟥", label: "Debe ser cada 1 dia",             short: "Cada 1 dia",          css: "lg-red"    },
+  orange: { symbol: "🟧", label: "Debe ser cada 3 dias",            short: "Cada 3 dias",          css: "lg-orange" },
+  yellow: { symbol: "🟨", label: "Puede ser cada 4 dias",           short: "Cada 4 dias",          css: "lg-yellow" },
+  green:  { symbol: "🟩", label: "Puede ser una semana (mas trabajo)", short: "Semanal (mas trabajo)", css: "lg-green"  },
+  purple: { symbol: "🟪", label: "Puede ser una semana (+)",         short: "Semanal (+)",          css: "lg-purple" },
+  none:   { symbol: "⚪", label: "Sin color definido en PDF",        short: "Sin color",            css: "lg-none"   }
 };
 
 const TASK_LIBRARY = {
   Freidora: [
-    { id: "canastas", name: "Canastas", color: "orange" },
-    { id: "tapas", name: "Tapas", color: "red" },
-    { id: "puertas", name: "Puertas", color: "red" },
-    { id: "tubo-drenaje", name: "Tubo de Drenaje", color: "red" },
-    { id: "laterales", name: "Laterales", color: "red" },
-    { id: "parte-atras", name: "Parte atras", color: "orange" },
-    { id: "filtrar-aceite", name: "Filtrar y limpiar el aceite", color: "orange" },
-    { id: "limpieza-interior", name: "Limpieza interior", color: "yellow" },
-    { id: "ruedas", name: "Ruedas", color: "purple" },
-    { id: "planchas-laterales", name: "Planchas laterales", color: "yellow" },
-    { id: "tuberia", name: "Tuberia", color: "yellow" },
-    { id: "paredes-izq-trasera", name: "Pared izquierda y pared trasera", color: "orange" }
+    { id: "canastas",            name: "Canastas",                              color: "orange" },
+    { id: "tapas",               name: "Tapas",                                 color: "red"    },
+    { id: "puertas",             name: "Puertas",                               color: "red"    },
+    { id: "tubo-drenaje",        name: "Tubo de Drenaje",                       color: "red"    },
+    { id: "laterales",           name: "Laterales",                             color: "red"    },
+    { id: "parte-atras",         name: "Parte atras",                           color: "orange" },
+    { id: "filtrar-aceite",      name: "Filtrar y limpiar el aceite",           color: "orange" },
+    { id: "limpieza-interior",   name: "Limpieza interior",                     color: "yellow" },
+    { id: "ruedas",              name: "Ruedas",                                color: "purple" },
+    { id: "planchas-laterales",  name: "Planchas laterales",                    color: "yellow" },
+    { id: "tuberia",             name: "Tuberia",                               color: "yellow" },
+    { id: "paredes-izq-trasera", name: "Pared izquierda y pared trasera",       color: "orange" }
   ],
   Plancha: [
-    { id: "laterales", name: "Laterales", color: "red" },
-    { id: "mesa", name: "Mesa", color: "red" },
-    { id: "patas", name: "Patas", color: "red" },
-    { id: "parte-atras", name: "Parte atras", color: "purple" },
-    { id: "cuberteria-utensilios", name: "Cuberteria (Donde se ponen los utensilios)", color: "red" },
-    { id: "pared-trasera", name: "Pared trasera", color: "none" },
-    { id: "tuberia", name: "Tuberia", color: "yellow" },
-    { id: "botones", name: "Botones", color: "red" }
+    { id: "laterales",            name: "Laterales",                                    color: "red"    },
+    { id: "mesa",                 name: "Mesa",                                         color: "red"    },
+    { id: "patas",                name: "Patas",                                        color: "red"    },
+    { id: "parte-atras",          name: "Parte atras",                                  color: "purple" },
+    { id: "cuberteria-utensilios",name: "Cuberteria (Donde se ponen los utensilios)",   color: "red"    },
+    { id: "pared-trasera",        name: "Pared trasera",                                color: "none"   },
+    { id: "tuberia",              name: "Tuberia",                                      color: "yellow" },
+    { id: "botones",              name: "Botones",                                      color: "red"    }
   ],
   Grill: [
-    { id: "hornillas", name: "Hornillas", color: "red" },
-    { id: "malla", name: "Malla", color: "orange" },
-    { id: "quemadores", name: "Quemadores", color: "green" },
-    { id: "carcaza", name: "Carcaza", color: "purple" },
-    { id: "laterales", name: "Laterales", color: "red" },
-    { id: "parte-atras", name: "Parte atras", color: "yellow" },
-    { id: "patas", name: "Patas", color: "red" },
-    { id: "plancha", name: "Plancha", color: "red" },
-    { id: "botones", name: "Botones", color: "red" },
-    { id: "tuberia", name: "Tuberia", color: "yellow" },
-    { id: "mesa", name: "Mesa", color: "red" },
-    { id: "cuberteria-utensilios", name: "Cuberteria (Donde se ponen los utensilios)", color: "red" }
+    { id: "hornillas",            name: "Hornillas",                                    color: "red"    },
+    { id: "malla",                name: "Malla",                                        color: "orange" },
+    { id: "quemadores",           name: "Quemadores",                                   color: "green"  },
+    { id: "carcaza",              name: "Carcaza",                                      color: "purple" },
+    { id: "laterales",            name: "Laterales",                                    color: "red"    },
+    { id: "parte-atras",          name: "Parte atras",                                  color: "yellow" },
+    { id: "patas",                name: "Patas",                                        color: "red"    },
+    { id: "plancha",              name: "Plancha",                                      color: "red"    },
+    { id: "botones",              name: "Botones",                                      color: "red"    },
+    { id: "tuberia",              name: "Tuberia",                                      color: "yellow" },
+    { id: "mesa",                 name: "Mesa",                                         color: "red"    },
+    { id: "cuberteria-utensilios",name: "Cuberteria (Donde se ponen los utensilios)",   color: "red"    }
   ],
   Estufa: [
-    { id: "hornillas", name: "Hornillas", color: "red" },
+    { id: "hornillas",  name: "Hornillas",  color: "red"    },
     { id: "quemadores", name: "Quemadores", color: "yellow" },
-    { id: "plancha", name: "Plancha", color: "red" },
-    { id: "carcaza", name: "Carcaza", color: "purple" },
-    { id: "mesa", name: "Mesa", color: "red" },
-    { id: "botones", name: "Botones", color: "red" },
-    { id: "tuberia", name: "Tuberia", color: "yellow" },
-    { id: "interior", name: "Interior", color: "purple" }
+    { id: "plancha",    name: "Plancha",    color: "red"    },
+    { id: "carcaza",    name: "Carcaza",    color: "purple" },
+    { id: "mesa",       name: "Mesa",       color: "red"    },
+    { id: "botones",    name: "Botones",    color: "red"    },
+    { id: "tuberia",    name: "Tuberia",    color: "yellow" },
+    { id: "interior",   name: "Interior",   color: "purple" }
   ],
   "Bano Maria": [
-    { id: "cuerpo", name: "Cuerpo", color: "red" },
-    { id: "bocas", name: "Bocas", color: "red" },
-    { id: "cuberteria", name: "Cuberteria", color: "red" },
-    { id: "cheffin", name: "Cheffin", color: "red" },
-    { id: "botones", name: "Botones", color: "red" },
-    { id: "microondas", name: "Microondas", color: "red" },
-    { id: "mesa-microondas", name: "Mesa del microondas", color: "none" },
-    { id: "mesa-pilon", name: "Mesa de Pilon", color: "red" },
-    { id: "pilones", name: "Pilones", color: "red" },
-    { id: "mano-pilon", name: "Mano de Pilon", color: "red" }
+    { id: "cuerpo",         name: "Cuerpo",             color: "red"  },
+    { id: "bocas",          name: "Bocas",               color: "red"  },
+    { id: "cuberteria",     name: "Cuberteria",          color: "red"  },
+    { id: "cheffin",        name: "Cheffin",             color: "red"  },
+    { id: "botones",        name: "Botones",             color: "red"  },
+    { id: "microondas",     name: "Microondas",          color: "red"  },
+    { id: "mesa-microondas",name: "Mesa del microondas", color: "none" },
+    { id: "mesa-pilon",     name: "Mesa de Pilon",       color: "red"  },
+    { id: "pilones",        name: "Pilones",             color: "red"  },
+    { id: "mano-pilon",     name: "Mano de Pilon",       color: "red"  }
   ],
   "Nevera 1": [
-    { id: "nevera", name: "Nevera", color: "yellow" },
-    { id: "limpieza-interior", name: "Limpieza interior", color: "purple" },
-    { id: "limpieza-exterior", name: "Limpieza exterior", color: "orange" },
-    { id: "organizacion", name: "Organizacion", color: "red" },
-    { id: "cambio-cambros", name: "Limpieza y cambio de cambros plasticos (Si amerita)", color: "red" }
+    { id: "nevera",          name: "Nevera",                                                    color: "yellow" },
+    { id: "limpieza-interior", name: "Limpieza interior",                                      color: "purple" },
+    { id: "limpieza-exterior", name: "Limpieza exterior",                                      color: "orange" },
+    { id: "organizacion",    name: "Organizacion",                                             color: "red"    },
+    { id: "cambio-cambros",  name: "Limpieza y cambio de cambros plasticos (Si amerita)",      color: "red"    }
   ],
   "Nevera 2": [
-    { id: "nevera", name: "Nevera", color: "yellow" },
-    { id: "limpieza-interior", name: "Limpieza interior", color: "purple" },
-    { id: "limpieza-exterior", name: "Limpieza exterior", color: "orange" },
-    { id: "organizacion", name: "Organizacion", color: "red" },
-    { id: "cambio-cambros", name: "Limpieza y cambio de cambros plasticos (Si amerita)", color: "red" }
+    { id: "nevera",          name: "Nevera",                                                    color: "yellow" },
+    { id: "limpieza-interior", name: "Limpieza interior",                                      color: "purple" },
+    { id: "limpieza-exterior", name: "Limpieza exterior",                                      color: "orange" },
+    { id: "organizacion",    name: "Organizacion",                                             color: "red"    },
+    { id: "cambio-cambros",  name: "Limpieza y cambio de cambros plasticos (Si amerita)",      color: "red"    }
   ],
   "Nevera 3": [
-    { id: "nevera", name: "Nevera", color: "yellow" },
-    { id: "limpieza-interior", name: "Limpieza interior", color: "purple" },
-    { id: "limpieza-exterior", name: "Limpieza exterior", color: "orange" },
-    { id: "organizacion", name: "Organizacion", color: "red" },
-    { id: "cambio-cambros", name: "Limpieza y cambio de cambros plasticos (Si amerita)", color: "red" }
+    { id: "nevera",          name: "Nevera",                                                    color: "yellow" },
+    { id: "limpieza-interior", name: "Limpieza interior",                                      color: "purple" },
+    { id: "limpieza-exterior", name: "Limpieza exterior",                                      color: "orange" },
+    { id: "organizacion",    name: "Organizacion",                                             color: "red"    },
+    { id: "cambio-cambros",  name: "Limpieza y cambio de cambros plasticos (Si amerita)",      color: "red"    }
   ],
   "Mesa de trabajo trasera": [
-    { id: "limpieza-completa", name: "Limpieza de mesa completa, exterior y interior", color: "purple" },
-    { id: "organizar-productos", name: "Organizar y limpiar productos colocados", color: "red" },
-    { id: "boca-biberones", name: "Boca de Biberones", color: "red" },
-    { id: "etiquetar-cambros", name: "Etiquetar y fechar cambros en nevera 1", color: "yellow" }
+    { id: "limpieza-completa",   name: "Limpieza de mesa completa, exterior y interior",       color: "purple" },
+    { id: "organizar-productos", name: "Organizar y limpiar productos colocados",              color: "red"    },
+    { id: "boca-biberones",      name: "Boca de Biberones",                                   color: "red"    },
+    { id: "etiquetar-cambros",   name: "Etiquetar y fechar cambros en nevera 1",              color: "yellow" }
   ],
   Zafacones: [
-    { id: "todos-zafacones", name: "Todos los Zafacones", color: "red" },
-    { id: "interior-exterior", name: "Interior y exterior", color: "red" }
+    { id: "todos-zafacones",  name: "Todos los Zafacones", color: "red" },
+    { id: "interior-exterior",name: "Interior y exterior",  color: "red" }
   ],
   "Mesa de despacho": [
-    { id: "mesa-despacho", name: "Mesa de despacho", color: "red" },
-    { id: "lamparas", name: "Lamparas", color: "none" },
-    { id: "bebedero", name: "Bebedero", color: "purple" },
-    { id: "canastas-vegetales", name: "Canastas de vegetales", color: "orange" },
-    { id: "escalera", name: "Escalera", color: "purple" },
-    { id: "planchas-nevera2", name: "Planchas encima de nevera 2", color: "purple" },
-    { id: "plancha-nevera3", name: "Plancha encima de nevera 3", color: "purple" }
+    { id: "mesa-despacho",     name: "Mesa de despacho",              color: "red"    },
+    { id: "lamparas",          name: "Lamparas",                      color: "none"   },
+    { id: "bebedero",          name: "Bebedero",                      color: "purple" },
+    { id: "canastas-vegetales",name: "Canastas de vegetales",         color: "orange" },
+    { id: "escalera",          name: "Escalera",                      color: "purple" },
+    { id: "planchas-nevera2",  name: "Planchas encima de nevera 2",   color: "purple" },
+    { id: "plancha-nevera3",   name: "Plancha encima de nevera 3",    color: "purple" }
   ],
   Piso: [
     { id: "cepillado-desgrasante", name: "Cepillado con jabon y Desgrasante", color: "red" }
@@ -162,23 +131,24 @@ const TASK_LIBRARY = {
 const TEAM_NAMES = Object.keys(TASK_LIBRARY);
 const TASK_INDEX = buildTaskIndex();
 
-const collaboratorForm = document.getElementById("collaborator-form");
+// DOM refs
+const collaboratorForm  = document.getElementById("collaborator-form");
 const collaboratorInput = document.getElementById("collaborator-name");
-const scheduleBody = document.getElementById("schedule-body");
-const taskForm = document.getElementById("task-form");
-const taskTeam = document.getElementById("task-team");
-const taskItem = document.getElementById("task-item");
-const taskFree = document.getElementById("task-free");
-const taskDone = document.getElementById("task-done");
+const scheduleBody      = document.getElementById("schedule-body");
+const taskTeam          = document.getElementById("task-team");
+const taskItem          = document.getElementById("task-item");
+const taskFree          = document.getElementById("task-free");
 const taskFrequencyHint = document.getElementById("task-frequency-hint");
-const clearTaskButton = document.getElementById("clear-task");
-const syncStatus = document.getElementById("sync-status");
-const modalOverlay = document.getElementById("cell-modal-overlay");
-const modalCellLabel = document.getElementById("modal-cell-label");
-const modalCloseBtn = document.getElementById("modal-close-btn");
-const modalCancelBtn = document.getElementById("modal-cancel-btn");
+const addTaskBtn        = document.getElementById("add-task-btn");
+const clearTaskButton   = document.getElementById("clear-task");
+const syncStatus        = document.getElementById("sync-status");
+const modalOverlay      = document.getElementById("cell-modal-overlay");
+const modalCellLabel    = document.getElementById("modal-cell-label");
+const modalCloseBtn     = document.getElementById("modal-close-btn");
+const modalCancelBtn    = document.getElementById("modal-cancel-btn");
+const modalTaskList     = document.getElementById("modal-task-list");
 
-let state = loadState() || createExampleState();
+let state = loadState() || createInitialState();
 let selectedCell = null;
 let remoteBoardRef = null;
 let remoteSaveTimer = null;
@@ -189,35 +159,12 @@ updateTeamSelectors();
 renderTable();
 initRemoteSync();
 
-taskTeam.addEventListener("change", () => {
-  updateTaskOptions(taskTeam.value, "");
-  syncDoneToggle();
-});
-
-taskItem.addEventListener("change", () => {
-  updateTaskHint(taskTeam.value, taskItem.value);
-  syncDoneToggle();
-});
-
-taskFree.addEventListener("change", () => {
-  if (taskFree.checked) {
-    taskTeam.value = "";
-    updateTaskOptions("", "");
-    taskDone.checked = false;
-    taskFrequencyHint.textContent = "FREE: colaborador libre (no trabaja).";
-  } else {
-    updateTaskOptions(taskTeam.value, taskItem.value);
-  }
-  syncDoneToggle();
-});
+// ── Event listeners ──────────────────────────────────────────────────
 
 collaboratorForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const name = collaboratorInput.value.trim();
-  if (!name) {
-    collaboratorInput.focus();
-    return;
-  }
+  if (!name) { collaboratorInput.focus(); return; }
   state.collaborators.push({ id: createId(), name });
   collaboratorInput.value = "";
   saveState();
@@ -231,20 +178,15 @@ scheduleBody.addEventListener("click", (event) => {
 
   const removeBtn = target.closest("[data-remove-collaborator]");
   if (removeBtn) {
-    const collaboratorId = removeBtn.getAttribute("data-remove-collaborator");
-    if (!collaboratorId) return;
-    const collaborator = state.collaborators.find((item) => item.id === collaboratorId);
+    const cid = removeBtn.getAttribute("data-remove-collaborator");
+    const collaborator = state.collaborators.find((c) => c.id === cid);
     if (!collaborator) return;
-    const ok = window.confirm(`Eliminar a ${collaborator.name} del calendario?`);
-    if (!ok) return;
-    state.collaborators = state.collaborators.filter((item) => item.id !== collaboratorId);
+    if (!window.confirm(`Eliminar a ${collaborator.name} del calendario?`)) return;
+    state.collaborators = state.collaborators.filter((c) => c.id !== cid);
     for (const key of Object.keys(state.tasks)) {
-      if (key.startsWith(`${collaboratorId}__`)) delete state.tasks[key];
+      if (key.startsWith(`${cid}__`)) delete state.tasks[key];
     }
-    if (selectedCell && selectedCell.collaboratorId === collaboratorId) {
-      selectedCell = null;
-      closeModal();
-    }
+    if (selectedCell && selectedCell.collaboratorId === cid) closeModal();
     saveState();
     renderTable();
     return;
@@ -252,100 +194,114 @@ scheduleBody.addEventListener("click", (event) => {
 
   const cellBtn = target.closest("[data-cell]");
   if (!cellBtn) return;
-
   const collaboratorId = cellBtn.getAttribute("data-collaborator");
   const dayIndex = Number(cellBtn.getAttribute("data-day"));
   if (!collaboratorId || Number.isNaN(dayIndex)) return;
-
   selectedCell = { collaboratorId, dayIndex };
   renderTable();
   openModal();
 });
 
-taskForm.addEventListener("submit", (event) => {
-  event.preventDefault();
+taskTeam.addEventListener("change", () => {
+  updateTaskOptions(taskTeam.value, "");
+  syncAddForm();
+});
+
+taskItem.addEventListener("change", () => {
+  updateTaskHint(taskTeam.value, taskItem.value);
+  syncAddForm();
+});
+
+taskFree.addEventListener("change", () => {
   if (!selectedCell) return;
-
-  if (taskFree.checked) {
-    const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-    state.tasks[key] = { free: true };
-    saveState();
-    renderTable();
-    closeModal();
-    return;
-  }
-
-  const team = taskTeam.value.trim();
-  const taskId = taskItem.value.trim();
-  if (!team) {
-    window.alert("Selecciona un equipo primero.");
-    return;
-  }
-  if (!taskId) {
-    window.alert("Selecciona una tarea del equipo.");
-    return;
-  }
-
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-  state.tasks[key] = { team, taskId, done: taskDone.checked };
+  if (taskFree.checked) {
+    state.tasks[key] = { free: true, items: [] };
+  } else {
+    delete state.tasks[key];
+  }
   saveState();
   renderTable();
-  closeModal();
+  renderModalTaskList();
+  syncAddForm();
+});
+
+addTaskBtn.addEventListener("click", () => {
+  if (!selectedCell) return;
+  const team = taskTeam.value.trim();
+  const taskId = taskItem.value.trim();
+  if (!team || !taskId) return;
+
+  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+  if (!state.tasks[key]) state.tasks[key] = { free: false, items: [] };
+  const cellData = state.tasks[key];
+  if (cellData.free) return;
+
+  if (cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
+    window.alert("Esta tarea ya esta asignada en este dia.");
+    return;
+  }
+
+  cellData.items.push({ id: createId(), team, taskId, done: false });
+  saveState();
+  renderTable();
+  renderModalTaskList();
+
+  taskTeam.value = "";
+  updateTaskOptions("", "");
+  taskFrequencyHint.textContent = "Selecciona equipo y tarea para ver la frecuencia del sharp.";
+  syncAddForm();
+});
+
+// Event delegation para lista de tareas del modal
+modalTaskList.addEventListener("change", (event) => {
+  const target = event.target;
+  if (target.dataset.toggleDone !== undefined) {
+    toggleTaskDone(Number(target.dataset.toggleDone), target.checked);
+  }
+});
+
+modalTaskList.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-remove-task]");
+  if (btn) removeTask(Number(btn.dataset.removeTask));
 });
 
 clearTaskButton.addEventListener("click", () => {
   if (!selectedCell) return;
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
   delete state.tasks[key];
+  taskFree.checked = false;
   saveState();
   renderTable();
-  closeModal();
+  renderModalTaskList();
+  syncAddForm();
 });
 
 modalCloseBtn.addEventListener("click", closeModal);
 modalCancelBtn.addEventListener("click", closeModal);
-
 modalOverlay.addEventListener("click", (event) => {
   if (event.target === modalOverlay) closeModal();
 });
 
+// ── Modal ─────────────────────────────────────────────────────────────
 
 function openModal() {
   if (!selectedCell) return;
-
-  const collaborator = state.collaborators.find((item) => item.id === selectedCell.collaboratorId);
+  const collaborator = state.collaborators.find((c) => c.id === selectedCell.collaboratorId);
   if (!collaborator) return;
 
   modalCellLabel.textContent = `${collaborator.name} — ${DAYS[selectedCell.dayIndex]}`;
 
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-  const assignment = state.tasks[key];
+  const cellData = state.tasks[key];
+  taskFree.checked = Boolean(cellData && cellData.free);
 
-  if (assignment) {
-    if (assignment.free) {
-      taskFree.checked = true;
-      taskTeam.value = "";
-      updateTaskOptions("", "");
-      taskDone.checked = false;
-      taskFrequencyHint.textContent = "FREE: colaborador libre (no trabaja).";
-    } else {
-      taskFree.checked = false;
-      taskTeam.value = assignment.team && hasTeam(assignment.team) ? assignment.team : "";
-      updateTaskOptions(taskTeam.value, assignment.taskId || "");
-      taskDone.checked = Boolean(assignment.done);
-      if (!assignment.taskId && assignment.text) {
-        taskFrequencyHint.textContent = `Tarea existente fuera del catalogo: ${assignment.text}.`;
-      }
-    }
-  } else {
-    taskFree.checked = false;
-    taskTeam.value = "";
-    updateTaskOptions("", "");
-    taskDone.checked = false;
-    taskFrequencyHint.textContent = "Selecciona equipo y tarea para ver la frecuencia del sharp.";
-  }
+  taskTeam.value = "";
+  updateTaskOptions("", "");
+  taskFrequencyHint.textContent = "Selecciona equipo y tarea para ver la frecuencia del sharp.";
 
-  syncDoneToggle();
+  renderModalTaskList();
+  syncAddForm();
   modalOverlay.classList.remove("hidden");
   taskTeam.focus();
 }
@@ -356,42 +312,74 @@ function closeModal() {
   renderTable();
 }
 
-function createExampleState() {
-  const collaborators = ["Daniela", "Victor", "Erick", "Sabrina", "Jhonn"].map((name) => ({
-    id: createId(),
-    name
-  }));
+function renderModalTaskList() {
+  if (!selectedCell) return;
+  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+  const cellData = state.tasks[key];
+  const isFree = Boolean(cellData && cellData.free);
+  const items = (!isFree && cellData && Array.isArray(cellData.items)) ? cellData.items : [];
 
-  const tasks = {};
-  // Lunes - Viernes
-  putTask(tasks, collaborators[0].id, 1, "Freidora", "canastas", false);
-  putTask(tasks, collaborators[1].id, 0, "Estufa", "hornillas", false);
-  putTask(tasks, collaborators[2].id, 2, "Plancha", "mesa", false);
-  putTask(tasks, collaborators[3].id, 3, "Freidora", "tuberia", true);
-  putTask(tasks, collaborators[4].id, 2, "Grill", "malla", false);
-  // Sabado (dia 5)
-  putTask(tasks, collaborators[0].id, 5, "Zafacones", "todos-zafacones", false);
-  putTask(tasks, collaborators[1].id, 5, "Piso", "cepillado-desgrasante", false);
-  putTask(tasks, collaborators[2].id, 5, "Nevera 1", "limpieza-interior", false);
-  putTask(tasks, collaborators[3].id, 5, "Mesa de despacho", "mesa-despacho", false);
-  putTask(tasks, collaborators[4].id, 5, "Grill", "hornillas", false);
-  // Domingo (dia 6)
-  putTask(tasks, collaborators[0].id, 6, "Freidora", "limpieza-interior", false);
-  putTask(tasks, collaborators[1].id, 6, "Estufa", "interior", false);
-  putTask(tasks, collaborators[2].id, 6, "Nevera 2", "limpieza-exterior", false);
-  putTask(tasks, collaborators[3].id, 6, "Mesa de trabajo trasera", "limpieza-completa", false);
-  putTask(tasks, collaborators[4].id, 6, "Bano Maria", "cuerpo", false);
+  if (items.length === 0) {
+    modalTaskList.innerHTML = '<p class="modal-no-tasks">Sin tareas asignadas. Agrega una abajo.</p>';
+    return;
+  }
 
-  return { collaborators, tasks };
+  modalTaskList.innerHTML = items.map((item, index) => {
+    const meta = resolveTaskMeta(item);
+    const doneClass = item.done ? "done" : "";
+    return `
+      <div class="modal-task-item ${doneClass}">
+        <label class="modal-task-check">
+          <input type="checkbox" ${item.done ? "checked" : ""} data-toggle-done="${index}">
+          <span>${meta.legend.symbol} <strong>${escapeHtml(meta.taskName)}</strong> — ${escapeHtml(meta.team)}</span>
+        </label>
+        <button type="button" class="modal-task-remove" data-remove-task="${index}" title="Eliminar">✕</button>
+      </div>
+    `;
+  }).join("");
 }
 
-function putTask(tasks, collaboratorId, dayIndex, team, taskId, done) {
-  tasks[buildCellKey(collaboratorId, dayIndex)] = { team, taskId, done };
+function toggleTaskDone(index, done) {
+  if (!selectedCell) return;
+  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+  const cellData = state.tasks[key];
+  if (!cellData || !Array.isArray(cellData.items) || !cellData.items[index]) return;
+  cellData.items[index].done = done;
+  saveState();
+  renderTable();
+  renderModalTaskList();
+}
+
+function removeTask(index) {
+  if (!selectedCell) return;
+  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+  const cellData = state.tasks[key];
+  if (!cellData || !Array.isArray(cellData.items)) return;
+  cellData.items.splice(index, 1);
+  if (cellData.items.length === 0) {
+    delete state.tasks[key];
+  }
+  saveState();
+  renderTable();
+  renderModalTaskList();
+}
+
+function syncAddForm() {
+  const isFree = taskFree.checked;
+  taskTeam.disabled = isFree;
+  taskItem.disabled = isFree || !taskTeam.value || !hasTeam(taskTeam.value);
+  addTaskBtn.disabled = isFree || !taskTeam.value || !taskItem.value;
+}
+
+// ── State ─────────────────────────────────────────────────────────────
+
+function createInitialState() {
+  return { collaborators: [], tasks: {} };
 }
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     return normalizeState(JSON.parse(raw));
   } catch (_) {
@@ -400,94 +388,89 @@ function loadState() {
 }
 
 function saveState(options = {}) {
-  saveLocalState();
-  if (!options.localOnly && !isApplyingRemoteState) {
-    queueRemoteSave();
-  }
-}
-
-function saveLocalState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  localStorage.removeItem(LEGACY_STORAGE_KEY);
+  if (!options.localOnly && !isApplyingRemoteState) queueRemoteSave();
 }
 
 function normalizeState(parsed) {
   if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.collaborators)) return null;
 
-  const sourceTasks = parsed.tasks && typeof parsed.tasks === "object" ? parsed.tasks : {};
   const collaborators = parsed.collaborators
-    .filter((item) => item && typeof item.id === "string" && typeof item.name === "string")
-    .map((item) => ({ id: item.id, name: item.name.trim() }))
-    .filter((item) => item.name.length > 0);
+    .filter((c) => c && typeof c.id === "string" && typeof c.name === "string")
+    .map((c) => ({ id: c.id, name: c.name.trim() }))
+    .filter((c) => c.name.length > 0);
 
+  const sourceTasks = parsed.tasks && typeof parsed.tasks === "object" ? parsed.tasks : {};
   const tasks = {};
+
   for (const [key, value] of Object.entries(sourceTasks)) {
     if (!value || typeof value !== "object") continue;
 
-    const done = Boolean(value.done);
-    const free = Boolean(value.free);
-    const team = typeof value.team === "string" ? value.team.trim() : "";
-    let taskId = typeof value.taskId === "string" ? value.taskId.trim() : "";
-    const text = typeof value.text === "string" ? value.text.trim() : "";
-    const colorKey = typeof value.colorKey === "string" ? value.colorKey.trim() : "";
-
-    if (free || normalizeText(text) === "free") {
-      tasks[key] = { free: true };
+    // Formato nuevo: tiene array items
+    if (Array.isArray(value.items)) {
+      if (value.free) {
+        tasks[key] = { free: true, items: [] };
+      } else {
+        const items = value.items.map(normalizeTaskItem).filter(Boolean);
+        if (items.length > 0) tasks[key] = { free: false, items };
+      }
       continue;
     }
 
-    if (!taskId && team && text) taskId = findTaskIdByText(team, text);
-
-    const normalized = { done };
-    if (team) normalized.team = team;
-    if (taskId && findTask(team, taskId)) {
-      normalized.taskId = taskId;
-    } else if (text) {
-      if (taskId) normalized.taskId = "";
-      normalized.text = text;
-      normalized.colorKey = LEGEND[colorKey] ? colorKey : "none";
-    } else {
+    // Formato antiguo: { free } o { team, taskId, done }
+    if (value.free) {
+      tasks[key] = { free: true, items: [] };
       continue;
     }
-
-    tasks[key] = normalized;
+    const item = normalizeTaskItem(value);
+    if (item) tasks[key] = { free: false, items: [item] };
   }
 
   return { collaborators, tasks };
 }
+
+function normalizeTaskItem(value) {
+  if (!value || typeof value !== "object") return null;
+  const done = Boolean(value.done);
+  const team = typeof value.team === "string" ? value.team.trim() : "";
+  let taskId = typeof value.taskId === "string" ? value.taskId.trim() : "";
+  const text = typeof value.text === "string" ? value.text.trim() : "";
+  const colorKey = typeof value.colorKey === "string" ? value.colorKey.trim() : "";
+  const id = typeof value.id === "string" ? value.id : createId();
+
+  if (!taskId && team && text) taskId = findTaskIdByText(team, text);
+
+  if (taskId && findTask(team, taskId)) return { id, team, taskId, done };
+  if (text) return { id, team, taskId: "", text, colorKey: LEGEND[colorKey] ? colorKey : "none", done };
+  return null;
+}
+
+// ── Firebase sync ─────────────────────────────────────────────────────
 
 function initRemoteSync() {
   if (!window.firebase || typeof firebase.initializeApp !== "function" || typeof firebase.database !== "function") {
     setSyncStatus("Modo local", "offline");
     return;
   }
-
   try {
-    const app = firebase.apps && firebase.apps.length > 0
-      ? firebase.app()
-      : firebase.initializeApp(FIREBASE_CONFIG);
+    const app = firebase.apps && firebase.apps.length > 0 ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
     const database = firebase.database(app);
     remoteBoardRef = database.ref(REMOTE_BOARD_PATH);
     setSyncStatus("Conectando...", "busy");
 
-    database.ref(".info/connected").on("value", (snapshot) => {
-      if (snapshot.val() === true) {
-        setSyncStatus(hasRemoteSnapshot ? "Sincronizado" : "Conectado", "online");
-      } else {
-        setSyncStatus("Sin conexion", "offline");
-      }
+    database.ref(".info/connected").on("value", (snap) => {
+      setSyncStatus(snap.val() === true ? (hasRemoteSnapshot ? "Sincronizado" : "Conectado") : "Sin conexion",
+                    snap.val() === true ? "online" : "offline");
     });
 
-    remoteBoardRef.on("value", (snapshot) => {
+    remoteBoardRef.on("value", (snap) => {
       hasRemoteSnapshot = true;
-      const remoteState = parseRemoteState(snapshot.val());
-
+      const remoteState = parseRemoteState(snap.val());
       if (!remoteState) {
         setSyncStatus("Subiendo datos iniciales...", "busy");
         queueRemoteSave({ immediate: true });
         return;
       }
-
       isApplyingRemoteState = true;
       state = remoteState;
       saveState({ localOnly: true });
@@ -495,12 +478,12 @@ function initRemoteSync() {
       updateTeamSelectors();
       renderTable();
       setSyncStatus("Sincronizado", "online");
-    }, (error) => {
-      console.error("Firebase sync error", error);
+    }, (err) => {
+      console.error("Firebase sync error", err);
       setSyncStatus("Error de sincronizacion", "error");
     });
-  } catch (error) {
-    console.error("Firebase init error", error);
+  } catch (err) {
+    console.error("Firebase init error", err);
     setSyncStatus("Modo local", "offline");
   }
 }
@@ -519,19 +502,14 @@ function parseRemoteState(value) {
 function queueRemoteSave(options = {}) {
   if (!remoteBoardRef) return;
   window.clearTimeout(remoteSaveTimer);
-  const delay = options.immediate ? 0 : SYNC_DEBOUNCE_MS;
   remoteSaveTimer = window.setTimeout(() => {
     setSyncStatus("Guardando...", "busy");
     remoteBoardRef.set({
       stateJson: JSON.stringify(state),
       updatedAt: firebase.database.ServerValue.TIMESTAMP
-    }).then(() => {
-      setSyncStatus("Sincronizado", "online");
-    }).catch((error) => {
-      console.error("Firebase save error", error);
-      setSyncStatus("Error al guardar", "error");
-    });
-  }, delay);
+    }).then(() => setSyncStatus("Sincronizado", "online"))
+      .catch((err) => { console.error("Firebase save error", err); setSyncStatus("Error al guardar", "error"); });
+  }, options.immediate ? 0 : SYNC_DEBOUNCE_MS);
 }
 
 function setSyncStatus(message, stateName) {
@@ -540,48 +518,59 @@ function setSyncStatus(message, stateName) {
   syncStatus.dataset.state = stateName || "busy";
 }
 
+// ── Render ────────────────────────────────────────────────────────────
+
 function renderTable() {
   if (state.collaborators.length === 0) {
     scheduleBody.innerHTML = `
       <tr>
-        <td class="row-name" colspan="${DAYS.length + 1}">
+        <td class="row-name" colspan="${DAYS.length + 1}" style="padding:1rem;text-align:center;color:#7a8677;">
           No hay colaboradores. Agrega uno para iniciar.
         </td>
-      </tr>
-    `;
+      </tr>`;
     return;
   }
 
-  const rows = state.collaborators.map((collaborator) => {
+  scheduleBody.innerHTML = state.collaborators.map((collaborator) => {
     const dayCells = DAYS.map((_, dayIndex) => {
       const key = buildCellKey(collaborator.id, dayIndex);
-      const assignment = state.tasks[key];
-      const isFree = Boolean(assignment && assignment.free);
-      const meta = assignment && !isFree ? resolveTaskMeta(assignment) : null;
+      const cellData = state.tasks[key];
+      const isFree = Boolean(cellData && cellData.free);
+      const items = (!isFree && cellData && Array.isArray(cellData.items)) ? cellData.items : [];
       const isSelected = Boolean(
         selectedCell &&
         selectedCell.collaboratorId === collaborator.id &&
         selectedCell.dayIndex === dayIndex
       );
 
-      const statusClass = !assignment ? "" : isFree ? "free" : assignment.done ? "done" : "pending";
-      const selectedClass = isSelected ? "selected" : "";
+      let statusClass = "";
+      if (isFree) {
+        statusClass = "free";
+      } else if (items.length > 0) {
+        statusClass = items.every((i) => i.done) ? "done" : "pending";
+      }
+
       const weekendClass = dayIndex >= 5 ? "weekend" : "";
-      const preview = isFree
-        ? `<span class="free-label">FREE</span>`
-        : meta
-        ? `${meta.legend.symbol} ${escapeHtml(trimText(meta.taskName, 36))}`
-        : "Asignar tarea";
-      const statusText = isFree
-        ? "Colaborador libre"
-        : meta
-        ? `${assignment.done ? "Realizada" : "Pendiente"} - ${escapeHtml(meta.team)}`
-        : "Sin tarea";
-      const title = isFree
-        ? "FREE - colaborador libre (no trabaja)"
-        : meta
-        ? `${meta.team} | ${meta.taskName} | ${meta.legend.label}`
-        : "Sin tarea";
+      const selectedClass = isSelected ? "selected" : "";
+
+      let cellContent = "";
+      if (isFree) {
+        cellContent = `<span class="free-label">FREE</span>`;
+      } else if (items.length > 0) {
+        cellContent = items.map((item) => {
+          const meta = resolveTaskMeta(item);
+          const chipDone = item.done ? "chip-done" : "";
+          return `<span class="task-chip ${chipDone}">${meta.legend.symbol} ${escapeHtml(trimText(meta.taskName, 20))}</span>`;
+        }).join("");
+      } else {
+        cellContent = `<span class="task-empty">+ Asignar tarea</span>`;
+      }
+
+      const titleParts = isFree
+        ? ["FREE - colaborador libre"]
+        : items.length > 0
+        ? items.map((i) => { const m = resolveTaskMeta(i); return `${m.team}: ${m.taskName}`; })
+        : ["Sin tarea"];
 
       return `
         <td class="task-cell ${weekendClass}" data-day-label="${escapeHtml(DAYS[dayIndex])}">
@@ -591,13 +580,9 @@ function renderTable() {
             data-cell="1"
             data-collaborator="${collaborator.id}"
             data-day="${dayIndex}"
-            title="${escapeHtml(title)}"
-          >
-            <span class="task-preview">${preview}</span>
-            <span class="status-preview">${statusText}</span>
-          </button>
-        </td>
-      `;
+            title="${escapeHtml(titleParts.join(" | "))}"
+          >${cellContent}</button>
+        </td>`;
     }).join("");
 
     return `
@@ -605,30 +590,24 @@ function renderTable() {
         <td class="row-name">
           <div class="name-wrap">
             <span>${escapeHtml(collaborator.name)}</span>
-            <button
-              type="button"
-              class="remove-btn"
+            <button type="button" class="remove-btn"
               data-remove-collaborator="${collaborator.id}"
               title="Eliminar colaborador"
-              aria-label="Eliminar colaborador ${escapeHtml(collaborator.name)}"
-            >
-              x
-            </button>
+              aria-label="Eliminar colaborador ${escapeHtml(collaborator.name)}">x</button>
           </div>
         </td>
         ${dayCells}
-      </tr>
-    `;
+      </tr>`;
   }).join("");
-
-  scheduleBody.innerHTML = rows;
 }
+
+// ── Selectors ─────────────────────────────────────────────────────────
 
 function updateTeamSelectors() {
   const teams = collectTeamsFromState();
   setSelectOptions(
     taskTeam,
-    [{ value: "", label: "Seleccionar equipo" }, ...teams.map((team) => ({ value: team, label: team }))],
+    [{ value: "", label: "Seleccionar equipo" }, ...teams.map((t) => ({ value: t, label: t }))],
     taskTeam.value
   );
   updateTaskOptions(taskTeam.value, taskItem.value);
@@ -636,30 +615,16 @@ function updateTeamSelectors() {
 
 function updateTaskOptions(team, selectedTaskId) {
   if (!team || !hasTeam(team)) {
-    setSelectOptions(
-      taskItem,
-      [{ value: "", label: "Selecciona un equipo primero" }],
-      ""
-    );
+    setSelectOptions(taskItem, [{ value: "", label: "Selecciona un equipo primero" }], "");
     taskItem.disabled = true;
     updateTaskHint("", "");
     return;
   }
-
-  const tasks = TASK_LIBRARY[team] || [];
-  const options = tasks.map((task) => {
+  const options = (TASK_LIBRARY[team] || []).map((task) => {
     const legend = LEGEND[task.color] || LEGEND.none;
-    return {
-      value: task.id,
-      label: `${legend.symbol} ${task.name} - ${legend.short}`
-    };
+    return { value: task.id, label: `${legend.symbol} ${task.name} - ${legend.short}` };
   });
-
-  setSelectOptions(
-    taskItem,
-    [{ value: "", label: "Seleccionar tarea" }, ...options],
-    selectedTaskId
-  );
+  setSelectOptions(taskItem, [{ value: "", label: "Seleccionar tarea" }, ...options], selectedTaskId);
   taskItem.disabled = false;
   updateTaskHint(team, taskItem.value);
 }
@@ -670,68 +635,47 @@ function updateTaskHint(team, taskId) {
     return;
   }
   const task = findTask(team, taskId);
-  if (!task) {
-    taskFrequencyHint.textContent = "No se encontro la tarea seleccionada.";
-    return;
-  }
+  if (!task) { taskFrequencyHint.textContent = "No se encontro la tarea."; return; }
   const legend = LEGEND[task.color] || LEGEND.none;
   taskFrequencyHint.textContent = `${legend.symbol} ${task.name}: ${legend.label}`;
 }
 
-function syncDoneToggle() {
-  const isFree = taskFree.checked;
-  taskTeam.disabled = isFree;
-
-  if (isFree) {
-    taskItem.disabled = true;
-  } else if (!taskTeam.value || !hasTeam(taskTeam.value)) {
-    taskItem.disabled = true;
-  } else {
-    taskItem.disabled = false;
-  }
-
-  taskDone.disabled = isFree || !taskTeam.value || !taskItem.value;
-}
-
 function collectTeamsFromState() {
-  const knownTeams = new Set(TEAM_NAMES);
-  const extraTeams = [];
-  for (const assignment of Object.values(state.tasks)) {
-    if (!assignment || typeof assignment.team !== "string") continue;
-    const team = assignment.team.trim();
-    if (!team || knownTeams.has(team)) continue;
-    knownTeams.add(team);
-    extraTeams.push(team);
+  const known = new Set(TEAM_NAMES);
+  const extra = [];
+  for (const cellData of Object.values(state.tasks)) {
+    if (!cellData || !Array.isArray(cellData.items)) continue;
+    for (const item of cellData.items) {
+      if (typeof item.team === "string" && item.team && !known.has(item.team)) {
+        known.add(item.team);
+        extra.push(item.team);
+      }
+    }
   }
-  return [...TEAM_NAMES, ...extraTeams];
+  return [...TEAM_NAMES, ...extra];
 }
 
-function setSelectOptions(selectElement, options, currentValue) {
-  const selectedValue = options.some((option) => option.value === currentValue)
-    ? currentValue
-    : options[0].value;
-  selectElement.innerHTML = "";
-  for (const option of options) {
-    const optionElement = document.createElement("option");
-    optionElement.value = option.value;
-    optionElement.textContent = option.label;
-    selectElement.append(optionElement);
+function setSelectOptions(el, options, currentValue) {
+  const selected = options.some((o) => o.value === currentValue) ? currentValue : options[0].value;
+  el.innerHTML = "";
+  for (const o of options) {
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.textContent = o.label;
+    el.append(opt);
   }
-  selectElement.value = selectedValue;
+  el.value = selected;
 }
 
-function resolveTaskMeta(assignment) {
-  const team = assignment.team && assignment.team.trim() ? assignment.team.trim() : "Sin equipo";
-  const task = findTask(team, assignment.taskId);
-  if (task) {
-    const legend = LEGEND[task.color] || LEGEND.none;
-    return { team, taskName: task.name, legend };
-  }
-  const fallbackText = assignment.text && assignment.text.trim()
-    ? assignment.text.trim()
-    : "Tarea sin catalogo";
-  const colorKey = LEGEND[assignment.colorKey] ? assignment.colorKey : "none";
-  return { team, taskName: fallbackText, legend: LEGEND[colorKey] };
+// ── Helpers ───────────────────────────────────────────────────────────
+
+function resolveTaskMeta(item) {
+  const team = item.team && item.team.trim() ? item.team.trim() : "Sin equipo";
+  const task = findTask(team, item.taskId);
+  if (task) return { team, taskName: task.name, legend: LEGEND[task.color] || LEGEND.none };
+  const fallback = item.text && item.text.trim() ? item.text.trim() : "Tarea sin catalogo";
+  const colorKey = LEGEND[item.colorKey] ? item.colorKey : "none";
+  return { team, taskName: fallback, legend: LEGEND[colorKey] };
 }
 
 function findTask(team, taskId) {
@@ -741,28 +685,17 @@ function findTask(team, taskId) {
 
 function findTaskIdByText(team, text) {
   if (!hasTeam(team) || !text) return "";
-  const normalizedTarget = normalizeText(text);
-  if (!normalizedTarget) return "";
+  const target = normalizeText(text);
+  if (!target) return "";
   for (const task of TASK_LIBRARY[team]) {
     const candidate = normalizeText(task.name);
-    if (
-      candidate === normalizedTarget ||
-      candidate.includes(normalizedTarget) ||
-      normalizedTarget.includes(candidate)
-    ) {
-      return task.id;
-    }
+    if (candidate === target || candidate.includes(target) || target.includes(candidate)) return task.id;
   }
   return "";
 }
 
 function normalizeText(value) {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function hasTeam(team) {
@@ -772,9 +705,7 @@ function hasTeam(team) {
 function buildTaskIndex() {
   const map = new Map();
   for (const [team, tasks] of Object.entries(TASK_LIBRARY)) {
-    for (const task of tasks) {
-      map.set(`${team}__${task.id}`, task);
-    }
+    for (const task of tasks) map.set(`${team}__${task.id}`, task);
   }
   return map;
 }
@@ -784,22 +715,17 @@ function buildCellKey(collaboratorId, dayIndex) {
 }
 
 function trimText(value, maxLength) {
-  if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength - 1)}...`;
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
 }
 
 function createId() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `id_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `id_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 }
 
 function escapeHtml(value) {
   return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <header class="app-header">
@@ -45,18 +45,24 @@
     </section>
   </main>
 
-  <!-- Modal flotante para editar casilla -->
+  <!-- Modal flotante -->
   <div id="cell-modal-overlay" class="modal-overlay hidden">
     <div class="modal-card">
       <div class="modal-head">
         <div>
-          <span class="modal-kicker">Asignar tarea</span>
+          <span class="modal-kicker">Tareas del dia</span>
           <strong id="modal-cell-label">-</strong>
         </div>
         <button type="button" id="modal-close-btn" class="modal-close-btn">✕</button>
       </div>
-      <form id="task-form">
-        <div class="modal-body">
+      <div class="modal-body">
+
+        <!-- Lista de tareas actuales -->
+        <div id="modal-task-list" class="modal-task-list"></div>
+
+        <!-- Formulario para agregar tarea -->
+        <div class="modal-add-section">
+          <strong class="modal-section-title">Agregar tarea</strong>
           <label class="modal-field">
             <span>Paso 1 — Equipo</span>
             <select id="task-team"></select>
@@ -66,26 +72,25 @@
             <select id="task-item"></select>
           </label>
           <p id="task-frequency-hint" class="hint-text">Selecciona equipo y tarea para ver la frecuencia del sharp.</p>
-          <label class="checkbox-row" for="task-free">
-            <input id="task-free" type="checkbox">
-            Colaborador libre (FREE — no trabaja)
-          </label>
-          <label class="checkbox-row" for="task-done">
-            <input id="task-done" type="checkbox">
-            Marcar como realizada
-          </label>
+          <button type="button" id="add-task-btn">+ Agregar tarea</button>
         </div>
-        <div class="modal-foot">
-          <button type="button" id="clear-task" class="btn-danger">Limpiar casilla</button>
-          <button type="button" id="modal-cancel-btn" class="secondary">Cancelar</button>
-          <button type="submit">Guardar tarea</button>
-        </div>
-      </form>
+
+        <!-- Libre -->
+        <label class="checkbox-row modal-free-row" for="task-free">
+          <input id="task-free" type="checkbox">
+          Colaborador libre (FREE — no trabaja este dia)
+        </label>
+
+      </div>
+      <div class="modal-foot">
+        <button type="button" id="clear-task" class="btn-danger">Limpiar todo</button>
+        <button type="button" id="modal-cancel-btn" class="secondary">Cerrar</button>
+      </div>
     </div>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=3"></script>
+  <script src="script.js?v=4"></script>
 </body>
 </html>
