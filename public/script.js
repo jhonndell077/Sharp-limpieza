@@ -636,15 +636,41 @@ function isTaskAssigned(team, taskId) {
   return getTaskAssignee(team, taskId) !== null;
 }
 
+// Returns how many consecutive days a task's color blocks after assignment.
+// red=1 (daily), orange=3, yellow=4, green/purple=7 (whole week).
+function getBlockDays(color) {
+  if (color === "red")    return 1;
+  if (color === "orange") return 3;
+  if (color === "yellow") return 4;
+  if (color === "green" || color === "purple") return 7;
+  return 1;
+}
+
 function getTaskAssignee(team, taskId) {
   if (!selectedCell) return null;
   const { dayIndex } = selectedCell;
+
+  const task      = findTask(team, taskId);
+  const blockDays = getBlockDays(task ? task.color : "none");
+
+  // An assignment on day d blocks the range [d, d + blockDays - 1].
+  // dayIndex is blocked when some assigned day d satisfies:
+  //   d <= dayIndex  AND  dayIndex <= d + blockDays - 1
+  //   => dayIndex - blockDays + 1 <= d <= dayIndex
+  const startDay = blockDays >= 7 ? 0 : Math.max(0, dayIndex - blockDays + 1);
+  const endDay   = blockDays >= 7 ? 6 : dayIndex;
+
   for (const collaborator of state.collaborators) {
-    const key = buildCellKey(collaborator.id, dayIndex);
-    const cellData = state.tasks[key];
-    if (!cellData || !Array.isArray(cellData.items)) continue;
-    if (cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
-      return collaborator.name;
+    for (let d = startDay; d <= endDay; d++) {
+      const key      = buildCellKey(collaborator.id, d);
+      const cellData = state.tasks[key];
+      if (!cellData || !Array.isArray(cellData.items)) continue;
+      if (cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
+        // If blocked because of an assignment on a DIFFERENT day, show which day
+        return d === dayIndex
+          ? collaborator.name
+          : `${collaborator.name} (${DAYS[d]})`;
+      }
     }
   }
   return null;
