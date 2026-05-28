@@ -135,9 +135,12 @@ let TEAM_NAMES = Object.keys(TASK_LIBRARY);
 const TASK_INDEX = buildTaskIndex();
 
 const ADMIN_PIN = "852347";
+let adminUnlocked    = false; // shared session unlock for all protected actions
 let libraryRef       = null;
 let libraryUnlocked  = false;
 let firebaseDB       = null;
+let pinGateSuccess   = null;
+let pinGateCancel    = null;
 
 // DOM refs
 const collaboratorForm  = document.getElementById("collaborator-form");
@@ -225,11 +228,13 @@ collaboratorForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const name = collaboratorInput.value.trim();
   if (!name) { collaboratorInput.focus(); return; }
-  state.collaborators.push({ id: createId(), name });
-  collaboratorInput.value = "";
-  saveState();
-  updateTeamSelectors();
-  renderTable();
+  requireAdmin("Agregar colaborador", () => {
+    state.collaborators.push({ id: createId(), name });
+    collaboratorInput.value = "";
+    saveState();
+    updateTeamSelectors();
+    renderTable();
+  });
 });
 
 scheduleBody.addEventListener("click", (event) => {
@@ -241,14 +246,16 @@ scheduleBody.addEventListener("click", (event) => {
     const cid = removeBtn.getAttribute("data-remove-collaborator");
     const collaborator = state.collaborators.find((c) => c.id === cid);
     if (!collaborator) return;
-    if (!window.confirm(`Eliminar a ${collaborator.name} del calendario?`)) return;
-    state.collaborators = state.collaborators.filter((c) => c.id !== cid);
-    for (const key of Object.keys(state.tasks)) {
-      if (key.startsWith(`${cid}__`) || key.includes(`__${cid}__`)) delete state.tasks[key];
-    }
-    if (selectedCell && selectedCell.collaboratorId === cid) closeModal();
-    saveState();
-    renderTable();
+    requireAdmin(`Eliminar a ${collaborator.name}`, () => {
+      if (!window.confirm(`¿Eliminar a ${collaborator.name} del calendario?`)) return;
+      state.collaborators = state.collaborators.filter((c) => c.id !== cid);
+      for (const key of Object.keys(state.tasks)) {
+        if (key.startsWith(`${cid}__`) || key.includes(`__${cid}__`)) delete state.tasks[key];
+      }
+      if (selectedCell && selectedCell.collaboratorId === cid) closeModal();
+      saveState();
+      renderTable();
+    });
     return;
   }
 
@@ -272,42 +279,43 @@ taskChecklist.addEventListener("change", () => {
 
 taskFree.addEventListener("change", () => {
   if (!selectedCell) return;
-  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-  if (taskFree.checked) {
-    state.tasks[key] = { free: true, items: [] };
-  } else {
-    delete state.tasks[key];
-  }
-  saveState();
-  renderTable();
-  renderModalTaskList();
-  renderTaskChecklist(taskFree.checked ? "" : taskTeam.value);
+  const newChecked = taskFree.checked;
+  requireAdmin("Marcar colaborador libre", () => {
+    const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+    if (newChecked) {
+      state.tasks[key] = { free: true, items: [] };
+    } else {
+      delete state.tasks[key];
+    }
+    saveState();
+    renderTable();
+    renderModalTaskList();
+    renderTaskChecklist(newChecked ? "" : taskTeam.value);
+  }, () => { taskFree.checked = !newChecked; });
 });
 
 addTaskBtn.addEventListener("click", () => {
   if (!selectedCell) return;
   const team = taskTeam.value.trim();
   if (!team) return;
-
   const checked = Array.from(taskChecklist.querySelectorAll("input[type='checkbox']:checked:not(:disabled)"));
   if (checked.length === 0) return;
-
-  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-  if (!state.tasks[key]) state.tasks[key] = { free: false, items: [] };
-  const cellData = state.tasks[key];
-  if (cellData.free) return;
-
-  for (const cb of checked) {
-    const taskId = cb.value;
-    if (!cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
-      cellData.items.push({ id: createId(), team, taskId, done: false });
+  requireAdmin("Agregar tareas seleccionadas", () => {
+    const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+    if (!state.tasks[key]) state.tasks[key] = { free: false, items: [] };
+    const cellData = state.tasks[key];
+    if (cellData.free) return;
+    for (const cb of checked) {
+      const taskId = cb.value;
+      if (!cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
+        cellData.items.push({ id: createId(), team, taskId, done: false });
+      }
     }
-  }
-
-  saveState();
-  renderTable();
-  renderModalTaskList();
-  renderTaskChecklist(team);
+    saveState();
+    renderTable();
+    renderModalTaskList();
+    renderTaskChecklist(team);
+  });
 });
 
 // Event delegation para lista de tareas del modal
@@ -325,13 +333,15 @@ modalTaskList.addEventListener("click", (event) => {
 
 clearTaskButton.addEventListener("click", () => {
   if (!selectedCell) return;
-  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-  delete state.tasks[key];
-  taskFree.checked = false;
-  saveState();
-  renderTable();
-  renderModalTaskList();
-  renderTaskChecklist(taskTeam.value);
+  requireAdmin("Limpiar todas las tareas del día", () => {
+    const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+    delete state.tasks[key];
+    taskFree.checked = false;
+    saveState();
+    renderTable();
+    renderModalTaskList();
+    renderTaskChecklist(taskTeam.value);
+  });
 });
 
 modalCloseBtn.addEventListener("click", closeModal);
@@ -344,6 +354,14 @@ modalOverlay.addEventListener("click", (event) => {
 weekPrevBtn.addEventListener("click", () => navigateWeek(-1));
 weekNextBtn.addEventListener("click", () => navigateWeek(1));
 
+document.getElementById("autofill-btn").addEventListener("click", () => {
+  if (!state.collaborators.length) { alert("Agrega al menos un colaborador antes de usar Auto-llenar."); return; }
+  requireAdmin("Auto-llenar semana con tareas aleatorias", () => {
+    if (!confirm("¿Llenar toda la semana con tareas al azar? Esto reemplazará las asignaciones existentes.")) return;
+    autoFillCalendar();
+  });
+});
+
 // Realizadas panel
 realizadasBtn.addEventListener("click", () => {
   renderRealizadasPanel();
@@ -351,6 +369,54 @@ realizadasBtn.addEventListener("click", () => {
 });
 realizadasCloseBtn.addEventListener("click", () => realizadasPanel.classList.add("hidden"));
 realizadasBackdrop.addEventListener("click", () => realizadasPanel.classList.add("hidden"));
+
+// ── PIN gate ───────────────────────────────────────────────────────────
+
+function requireAdmin(description, onSuccess, onCancel) {
+  if (adminUnlocked) { onSuccess(); return; }
+  pinGateSuccess = onSuccess;
+  pinGateCancel  = onCancel || null;
+  document.getElementById("pin-gate-title").textContent = description;
+  document.getElementById("pin-gate-desc").textContent  = "Ingresa el código de acceso para continuar.";
+  document.getElementById("pin-gate-input").value       = "";
+  document.getElementById("pin-gate-error").classList.add("hidden");
+  document.getElementById("pin-gate-overlay").classList.remove("hidden");
+  setTimeout(() => document.getElementById("pin-gate-input").focus(), 80);
+}
+
+function closePinGate() {
+  document.getElementById("pin-gate-overlay").classList.add("hidden");
+  if (pinGateCancel) { pinGateCancel(); }
+  pinGateSuccess = null;
+  pinGateCancel  = null;
+}
+
+function confirmPinGate() {
+  const input = document.getElementById("pin-gate-input");
+  if (input.value === ADMIN_PIN) {
+    adminUnlocked = true;
+    libraryUnlocked = true;
+    document.getElementById("pin-gate-overlay").classList.add("hidden");
+    const cb = pinGateSuccess;
+    pinGateSuccess = null;
+    pinGateCancel  = null;
+    if (cb) cb();
+  } else {
+    document.getElementById("pin-gate-error").classList.remove("hidden");
+    input.value = "";
+    input.focus();
+  }
+}
+
+document.getElementById("pin-gate-confirm-btn").addEventListener("click", confirmPinGate);
+document.getElementById("pin-gate-close-btn").addEventListener("click", closePinGate);
+document.getElementById("pin-gate-cancel-btn").addEventListener("click", closePinGate);
+document.getElementById("pin-gate-overlay").addEventListener("click", (e) => {
+  if (e.target === document.getElementById("pin-gate-overlay")) closePinGate();
+});
+document.getElementById("pin-gate-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") confirmPinGate();
+});
 
 // ── Library Modal ──────────────────────────────────────────────────────
 
@@ -388,6 +454,7 @@ function closeLibraryModal() {
 
 function verifyLibraryPin() {
   if (libraryPinInput.value === ADMIN_PIN) {
+    adminUnlocked   = true;
     libraryUnlocked = true;
     showLibraryMgmt();
   } else {
@@ -1259,6 +1326,53 @@ function createId() {
   return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : `id_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function autoFillCalendar() {
+  // Build flat list of all tasks from library
+  const allTasks = [];
+  for (const [team, tasks] of Object.entries(TASK_LIBRARY)) {
+    for (const task of tasks) allTasks.push({ team, taskId: task.id });
+  }
+  if (allTasks.length < 7) {
+    alert("La biblioteca necesita al menos 7 tareas para usar Auto-llenar.");
+    return;
+  }
+
+  const collabs    = state.collaborators;
+  const numCollabs = collabs.length;
+  // Minimum tasks per collaborator to guarantee ≥ 7 total per day
+  const perCollab  = Math.max(1, Math.ceil(7 / numCollabs));
+
+  for (let d = 0; d < 7; d++) {
+    // Fresh shuffle for each day so each day gets a different distribution
+    let pool = shuffleArray(allTasks);
+    // Extend pool if (unlikely) we need more slots than available unique tasks
+    while (pool.length < perCollab * numCollabs) pool = [...pool, ...shuffleArray(allTasks)];
+
+    for (let ci = 0; ci < numCollabs; ci++) {
+      const key   = buildCellKey(collabs[ci].id, d);
+      const items = [];
+      for (let t = 0; t < perCollab; t++) {
+        const task = pool[ci * perCollab + t];
+        items.push({ id: createId(), team: task.team, taskId: task.taskId, done: false });
+      }
+      state.tasks[key] = { free: false, items };
+    }
+  }
+
+  saveState();
+  renderTable();
+  if (selectedCell) closeModal();
 }
 
 // Returns "YYYY-MM-DD" of the active week's Monday.

@@ -78,7 +78,15 @@ body, main, section { min-width: 0; }
 
 /* ── Toolbar ─────────────────────────────────────────────── */
 
-.toolbar { margin-bottom: 0.75rem; }
+.toolbar {
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.toolbar form { flex: 1; min-width: 200px; }
 
 .toolbar label {
   display: block;
@@ -93,6 +101,18 @@ body, main, section { min-width: 0; }
 }
 
 .input-row input { flex: 1; min-width: 0; }
+
+.autofill-btn {
+  background: #5e35b1;
+  font-size: 0.88rem;
+  padding: 0.55rem 0.9rem;
+  white-space: nowrap;
+  align-self: flex-end;
+}
+.autofill-btn:hover { filter: brightness(1.12); }
+
+/* ── PIN gate modal ──────────────────────────────────────── */
+.pin-gate-card { max-width: 340px; }
 
 /* ── Form controls ───────────────────────────────────────── */
 
