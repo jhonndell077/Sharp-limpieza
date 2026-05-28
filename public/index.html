@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
   <header class="app-header">
@@ -44,64 +44,49 @@
         </table>
       </div>
     </section>
+  </main>
 
-    <aside class="side-panel">
-      <section class="card">
-        <h2>Editar casilla</h2>
-        <p id="selected-cell-label">Selecciona una casilla del calendario para cargar la tarea.</p>
-
-        <form id="task-form">
-          <label for="task-team">Paso 1 - Equipo</label>
-          <select id="task-team"></select>
-
-          <label for="task-item">Paso 2 - Tarea del equipo</label>
-          <select id="task-item"></select>
+  <!-- Modal flotante para editar casilla -->
+  <div id="cell-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <span class="modal-kicker">Asignar tarea</span>
+          <strong id="modal-cell-label">-</strong>
+        </div>
+        <button type="button" id="modal-close-btn" class="modal-close-btn">✕</button>
+      </div>
+      <form id="task-form">
+        <div class="modal-body">
+          <label class="modal-field">
+            <span>Paso 1 — Equipo</span>
+            <select id="task-team"></select>
+          </label>
+          <label class="modal-field">
+            <span>Paso 2 — Tarea</span>
+            <select id="task-item"></select>
+          </label>
           <p id="task-frequency-hint" class="hint-text">Selecciona equipo y tarea para ver la frecuencia del sharp.</p>
-
           <label class="checkbox-row" for="task-free">
             <input id="task-free" type="checkbox">
-            Colaborador libre (FREE - no trabaja)
+            Colaborador libre (FREE — no trabaja)
           </label>
-
           <label class="checkbox-row" for="task-done">
             <input id="task-done" type="checkbox">
             Marcar como realizada
           </label>
-
-          <div class="action-row">
-            <button type="submit">Guardar tarea</button>
-            <button id="clear-task" type="button" class="secondary">Limpiar casilla</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Resumen</h2>
-        <div class="filter-row">
-          <label for="team-filter">Equipo para ver realizadas</label>
-          <select id="team-filter"></select>
         </div>
-        <div class="summary-columns">
-          <div>
-            <h3>Pendientes (<span id="pending-count">0</span>)</h3>
-            <ul id="pending-list" class="task-list"></ul>
-          </div>
-          <div>
-            <h3>Realizadas (<span id="done-count">0</span>)</h3>
-            <ul id="done-list" class="task-list"></ul>
-          </div>
+        <div class="modal-foot">
+          <button type="button" id="clear-task" class="btn-danger">Limpiar casilla</button>
+          <button type="button" id="modal-cancel-btn" class="secondary">Cancelar</button>
+          <button type="submit">Guardar tarea</button>
         </div>
-      </section>
-
-      <section class="card">
-        <h2>Leyenda de colores</h2>
-        <ul id="legend-list" class="legend-list"></ul>
-      </section>
-    </aside>
-  </main>
+      </form>
+    </div>
+  </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=2"></script>
+  <script src="script.js?v=3"></script>
 </body>
 </html>
