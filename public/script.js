@@ -473,10 +473,12 @@ document.getElementById("branch-add-new-btn").addEventListener("click", () => {
   const id = name.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `branch-${Date.now()}`;
   if (branches.some((b) => b.id === id)) { alert("Ya existe una sucursal con nombre similar."); return; }
-  branches.push({ id, name: name.trim(), pin: trimmedPin });
-  saveBranchConfig();
-  renderBranchSettings();
-  renderBranchList();
+  requireAdmin("Crear nueva sucursal", () => {
+    branches.push({ id, name: name.trim(), pin: trimmedPin });
+    saveBranchConfig();
+    renderBranchSettings();
+    renderBranchList();
+  });
 });
 
 function openLibraryModal() {
@@ -541,11 +543,14 @@ function renderLibraryMgmt() {
 
   libraryMgmtBody.querySelectorAll(".lib-delete-team").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (!confirm(`¿Eliminar el equipo "${btn.dataset.team}" y todas sus tareas?`)) return;
-      delete TASK_LIBRARY[btn.dataset.team];
-      saveLibraryToFirebase();
-      rebuildLibraryDerived();
-      renderLibraryMgmt();
+      const team = btn.dataset.team;
+      requireAdmin(`Eliminar equipo "${team}"`, () => {
+        if (!confirm(`¿Eliminar el equipo "${team}" y todas sus tareas? Esta acción no se puede deshacer.`)) return;
+        delete TASK_LIBRARY[team];
+        saveLibraryToFirebase();
+        rebuildLibraryDerived();
+        renderLibraryMgmt();
+      });
     });
   });
 
@@ -553,10 +558,12 @@ function renderLibraryMgmt() {
     btn.addEventListener("click", () => {
       const { team, taskId } = btn.dataset;
       if (!TASK_LIBRARY[team]) return;
-      TASK_LIBRARY[team] = TASK_LIBRARY[team].filter((t) => t.id !== taskId);
-      saveLibraryToFirebase();
-      rebuildLibraryDerived();
-      renderLibraryMgmt();
+      requireAdmin("Eliminar tarea de biblioteca", () => {
+        TASK_LIBRARY[team] = TASK_LIBRARY[team].filter((t) => t.id !== taskId);
+        saveLibraryToFirebase();
+        rebuildLibraryDerived();
+        renderLibraryMgmt();
+      });
     });
   });
 
@@ -825,6 +832,7 @@ photoConfirmBtn.addEventListener("click", async () => {
 });
 
 photoModalCloseBtn.addEventListener("click", () => closePhotoModal(null));
+photoCancelBtn.addEventListener("click", () => closePhotoModal(null));
 
 function closePhotoModal(photoUrl) {
   if (photoStream) {
@@ -856,7 +864,7 @@ function renderModalTaskList() {
   modalTaskList.innerHTML = items.map((item, index) => {
     const meta = resolveTaskMeta(item);
     const doneClass = item.done ? "done" : "";
-    const thumbHtml = item.done && item.evidencePhotoUrl
+    const thumbHtml = item.done && isSafeUrl(item.evidencePhotoUrl)
       ? `<a href="${escapeHtml(item.evidencePhotoUrl)}" target="_blank" rel="noopener" title="Ver evidencia fotográfica">
            <img src="${escapeHtml(item.evidencePhotoUrl)}" class="task-evidence-thumb" alt="Evidencia" loading="lazy">
          </a>`
@@ -1171,7 +1179,7 @@ function initBranchConfigSync() {
       }
     }
   });
-  showBranchSelector();
+  if (!currentBranch) showBranchSelector();
 }
 
 function showBranchSelector() {
@@ -1315,11 +1323,13 @@ function renderBranchSettings() {
       if (!newName || !newPin) { alert("Nombre y contraseña son requeridos."); return; }
       const branch = branches.find((b) => b.id === btn.getAttribute("data-branch-id"));
       if (!branch) return;
-      branch.name = newName;
-      branch.pin  = newPin;
-      saveBranchConfig();
-      renderBranchSettings();
-      renderBranchList();
+      requireAdmin(`Cambiar datos de sucursal "${branch.name}"`, () => {
+        branch.name = newName;
+        branch.pin  = newPin;
+        saveBranchConfig();
+        renderBranchSettings();
+        renderBranchList();
+      });
     });
   });
 
@@ -1327,11 +1337,13 @@ function renderBranchSettings() {
     btn.addEventListener("click", () => {
       const branch = branches.find((b) => b.id === btn.getAttribute("data-branch-id"));
       if (!branch) return;
-      if (!confirm(`¿Eliminar la sucursal "${branch.name}"?`)) return;
-      branches = branches.filter((b) => b.id !== branch.id);
-      saveBranchConfig();
-      renderBranchSettings();
-      renderBranchList();
+      requireAdmin(`Eliminar sucursal "${branch.name}"`, () => {
+        if (!confirm(`¿Eliminar la sucursal "${branch.name}"? Esta acción no se puede deshacer.`)) return;
+        branches = branches.filter((b) => b.id !== branch.id);
+        saveBranchConfig();
+        renderBranchSettings();
+        renderBranchList();
+      });
     });
   });
 }
@@ -1690,7 +1702,7 @@ function renderRealizadasPanel() {
       const timeStr = item.completedAt
         ? new Date(item.completedAt).toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" })
         : "";
-      const thumbHtml = item.evidencePhotoUrl
+      const thumbHtml = isSafeUrl(item.evidencePhotoUrl)
         ? `<a href="${escapeHtml(item.evidencePhotoUrl)}" target="_blank" rel="noopener">
              <img src="${escapeHtml(item.evidencePhotoUrl)}" class="realizadas-thumb" alt="Evidencia" loading="lazy">
            </a>`
@@ -1717,4 +1729,10 @@ function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+
+function isSafeUrl(url) {
+  if (!url || typeof url !== "string") return false;
+  const lower = url.trimStart().toLowerCase();
+  return lower.startsWith("https://") || lower.startsWith("data:image/");
 }
