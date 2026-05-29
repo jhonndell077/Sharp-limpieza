@@ -232,20 +232,19 @@ setInterval(() => {
 
 // ── Event listeners ──────────────────────────────────────────────────
 
-collaboratorForm.addEventListener("submit", (event) => {
+collaboratorForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const name = collaboratorInput.value.trim();
   if (!name) { collaboratorInput.focus(); return; }
-  requireAdmin("Agregar colaborador", () => {
-    state.collaborators.push({ id: createId(), name });
-    collaboratorInput.value = "";
-    saveState();
-    updateTeamSelectors();
-    renderTable();
-  });
+  if (!await requestActionPin("Agregar colaborador")) return;
+  state.collaborators.push({ id: createId(), name });
+  collaboratorInput.value = "";
+  saveState();
+  updateTeamSelectors();
+  renderTable();
 });
 
-scheduleBody.addEventListener("click", (event) => {
+scheduleBody.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
 
@@ -254,16 +253,15 @@ scheduleBody.addEventListener("click", (event) => {
     const cid = removeBtn.getAttribute("data-remove-collaborator");
     const collaborator = state.collaborators.find((c) => c.id === cid);
     if (!collaborator) return;
-    requireAdmin(`Eliminar a ${collaborator.name}`, () => {
-      if (!window.confirm(`¿Eliminar a ${collaborator.name} del calendario?`)) return;
-      state.collaborators = state.collaborators.filter((c) => c.id !== cid);
-      for (const key of Object.keys(state.tasks)) {
-        if (key.startsWith(`${cid}__`) || key.includes(`__${cid}__`)) delete state.tasks[key];
-      }
-      if (selectedCell && selectedCell.collaboratorId === cid) closeModal();
-      saveState();
-      renderTable();
-    });
+    if (!await requestActionPin(`Eliminar a ${collaborator.name}`)) return;
+    if (!window.confirm(`¿Eliminar a ${collaborator.name} del calendario?`)) return;
+    state.collaborators = state.collaborators.filter((c) => c.id !== cid);
+    for (const key of Object.keys(state.tasks)) {
+      if (key.startsWith(`${cid}__`) || key.includes(`__${cid}__`)) delete state.tasks[key];
+    }
+    if (selectedCell && selectedCell.collaboratorId === cid) closeModal();
+    saveState();
+    renderTable();
     return;
   }
 
@@ -285,79 +283,80 @@ taskChecklist.addEventListener("change", () => {
   syncAddForm();
 });
 
-taskFree.addEventListener("change", () => {
+taskFree.addEventListener("change", async () => {
   if (!selectedCell) return;
   const newChecked = taskFree.checked;
-  requireAdmin("Marcar colaborador libre", () => {
-    const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-    if (newChecked) {
-      state.tasks[key] = { free: true, items: [] };
-    } else {
-      delete state.tasks[key];
-    }
-    saveState();
-    renderTable();
-    renderModalTaskList();
-    renderTaskChecklist(newChecked ? "" : taskTeam.value);
-  }, () => { taskFree.checked = !newChecked; });
+  if (!await requestActionPin("Marcar colaborador libre")) {
+    taskFree.checked = !newChecked;
+    return;
+  }
+  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+  if (newChecked) {
+    state.tasks[key] = { free: true, items: [] };
+  } else {
+    delete state.tasks[key];
+  }
+  saveState();
+  renderTable();
+  renderModalTaskList();
+  renderTaskChecklist(newChecked ? "" : taskTeam.value);
 });
 
-addTaskBtn.addEventListener("click", () => {
+addTaskBtn.addEventListener("click", async () => {
   if (!selectedCell) return;
   const team = taskTeam.value.trim();
   if (!team) return;
   const checked = Array.from(taskChecklist.querySelectorAll("input[type='checkbox']:checked:not(:disabled)"));
   if (checked.length === 0) return;
-  requireAdmin("Agregar tareas seleccionadas", () => {
-    const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-    if (!state.tasks[key]) state.tasks[key] = { free: false, items: [] };
-    const cellData = state.tasks[key];
-    if (cellData.free) return;
-    for (const cb of checked) {
-      const taskId = cb.value;
-      if (!cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
-        cellData.items.push({ id: createId(), team, taskId, done: false });
-      }
+  if (!await requestActionPin("Agregar tareas seleccionadas")) return;
+  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+  if (!state.tasks[key]) state.tasks[key] = { free: false, items: [] };
+  const cellData = state.tasks[key];
+  if (cellData.free) return;
+  for (const cb of checked) {
+    const taskId = cb.value;
+    if (!cellData.items.some((item) => item.team === team && item.taskId === taskId)) {
+      cellData.items.push({ id: createId(), team, taskId, done: false });
     }
-    saveState();
-    renderTable();
-    renderModalTaskList();
-    renderTaskChecklist(team);
-  });
+  }
+  saveState();
+  renderTable();
+  renderModalTaskList();
+  renderTaskChecklist(team);
 });
 
 // Event delegation para lista de tareas del modal
-modalTaskList.addEventListener("change", (event) => {
+modalTaskList.addEventListener("change", async (event) => {
   const target = event.target;
   if (target.dataset.toggleDone !== undefined) {
     const index   = Number(target.dataset.toggleDone);
     const checked = target.checked;
-    requireAdmin("Marcar tarea como realizada", () => {
-      toggleTaskDone(index, checked);
-    }, () => {
-      target.checked = !checked; // revert checkbox if PIN cancelled
-    });
+    if (!await requestActionPin("Marcar tarea como realizada")) {
+      target.checked = !checked;
+      return;
+    }
+    await toggleTaskDone(index, checked);
   }
 });
 
-modalTaskList.addEventListener("click", (event) => {
+modalTaskList.addEventListener("click", async (event) => {
   const btn = event.target.closest("[data-remove-task]");
   if (btn) {
-    requireAdmin("Eliminar tarea", () => removeTask(Number(btn.dataset.removeTask)));
+    if (!await requestActionPin("Eliminar tarea")) return;
+    removeTask(Number(btn.dataset.removeTask));
   }
 });
 
-clearTaskButton.addEventListener("click", () => {
+clearTaskButton.addEventListener("click", async () => {
   if (!selectedCell) return;
-  requireAdmin("Limpiar todas las tareas del día", () => {
-    const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
-    delete state.tasks[key];
-    taskFree.checked = false;
-    saveState();
-    renderTable();
-    renderModalTaskList();
-    renderTaskChecklist(taskTeam.value);
-  });
+  if (!await requestActionPin("Limpiar todas las tareas del día")) return;
+  const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
+  delete state.tasks[key];
+  taskFree.checked = false;
+  saveState();
+  renderTable();
+  renderModalTaskList();
+  renderTaskChecklist(taskTeam.value);
 });
 
 modalCloseBtn.addEventListener("click", closeModal);
@@ -367,15 +366,20 @@ modalOverlay.addEventListener("click", (event) => {
 });
 
 // Week navigation
-weekPrevBtn.addEventListener("click", () => navigateWeek(-1));
-weekNextBtn.addEventListener("click", () => navigateWeek(1));
+weekPrevBtn.addEventListener("click", async () => {
+  if (!await requestActionPin("Semana anterior")) return;
+  navigateWeek(-1);
+});
+weekNextBtn.addEventListener("click", async () => {
+  if (!await requestActionPin("Semana siguiente")) return;
+  navigateWeek(1);
+});
 
-document.getElementById("autofill-btn").addEventListener("click", () => {
+document.getElementById("autofill-btn").addEventListener("click", async () => {
   if (!state.collaborators.length) { alert("Agrega al menos un colaborador antes de usar Auto-llenar."); return; }
-  requireAdmin("Auto-llenar semana con tareas aleatorias", () => {
-    if (!confirm("¿Llenar toda la semana con tareas al azar? Esto reemplazará las asignaciones existentes.")) return;
-    autoFillCalendar();
-  });
+  if (!await requestActionPin("Auto-llenar semana")) return;
+  if (!confirm("¿Llenar toda la semana con tareas al azar? Esto reemplazará las asignaciones existentes.")) return;
+  autoFillCalendar();
 });
 
 // Realizadas panel
@@ -388,17 +392,31 @@ realizadasBackdrop.addEventListener("click", () => realizadasPanel.classList.add
 
 // ── PIN gate ───────────────────────────────────────────────────────────
 
+// Core: shows the PIN gate and returns a Promise that resolves to true (correct PIN)
+// or false (wrong PIN, cancelled, or gate already open).
+// No storage of any kind — every call requires fresh PIN entry.
+function requestActionPin(description) {
+  const overlay = document.getElementById("pin-gate-overlay");
+  if (!overlay.classList.contains("hidden")) return Promise.resolve(false);
+
+  return new Promise((resolve) => {
+    pinGateSuccess = () => resolve(true);
+    pinGateCancel  = () => resolve(false);
+    document.getElementById("pin-gate-title").textContent = description || "Acción protegida";
+    document.getElementById("pin-gate-desc").textContent  = "Ingresa el código de acceso para continuar.";
+    document.getElementById("pin-gate-input").value       = "";
+    document.getElementById("pin-gate-error").classList.add("hidden");
+    overlay.classList.remove("hidden");
+    setTimeout(() => document.getElementById("pin-gate-input").focus(), 80);
+  });
+}
+
+// Backward-compatible wrapper for callback-style callers (library / branch management)
 function requireAdmin(description, onSuccess, onCancel) {
-  // Ignore if gate is already open — prevents rapid-click overwriting the active callback
-  if (!document.getElementById("pin-gate-overlay").classList.contains("hidden")) return;
-  pinGateSuccess = onSuccess;
-  pinGateCancel  = onCancel || null;
-  document.getElementById("pin-gate-title").textContent = description;
-  document.getElementById("pin-gate-desc").textContent  = "Ingresa el código de acceso para continuar.";
-  document.getElementById("pin-gate-input").value       = "";
-  document.getElementById("pin-gate-error").classList.add("hidden");
-  document.getElementById("pin-gate-overlay").classList.remove("hidden");
-  setTimeout(() => document.getElementById("pin-gate-input").focus(), 80);
+  requestActionPin(description).then((allowed) => {
+    if (allowed) { if (onSuccess) onSuccess(); }
+    else         { if (onCancel)  onCancel();  }
+  });
 }
 
 function closePinGate() {
@@ -435,13 +453,12 @@ document.getElementById("pin-gate-input").addEventListener("keydown", (e) => {
 
 // ── Library Modal ──────────────────────────────────────────────────────
 
-document.getElementById("library-btn").addEventListener("click", () => {
-  requireAdmin("Acceder a Gestión de Tareas", () => {
-    libraryModalOverlay.classList.remove("hidden");
-    libraryPinView.classList.add("hidden");
-    libraryMgmtView.classList.remove("hidden");
-    renderLibraryMgmt();
-  });
+document.getElementById("library-btn").addEventListener("click", async () => {
+  if (!await requestActionPin("Acceder a Gestión de Tareas")) return;
+  libraryModalOverlay.classList.remove("hidden");
+  libraryPinView.classList.add("hidden");
+  libraryMgmtView.classList.remove("hidden");
+  renderLibraryMgmt();
 });
 document.getElementById("library-pin-close-btn").addEventListener("click", closeLibraryModal);
 document.getElementById("library-pin-cancel-btn").addEventListener("click", closeLibraryModal);
