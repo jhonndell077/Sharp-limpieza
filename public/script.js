@@ -543,10 +543,12 @@ function renderLibraryMgmt() {
     const name = input.value.trim();
     if (!name) { input.focus(); return; }
     if (TASK_LIBRARY[name]) { alert("Ya existe un equipo con ese nombre."); return; }
-    TASK_LIBRARY[name] = [];
-    saveLibraryToFirebase();
-    rebuildLibraryDerived();
-    renderLibraryMgmt();
+    requireAdmin("Agregar nuevo equipo", () => {
+      TASK_LIBRARY[name] = [];
+      saveLibraryToFirebase();
+      rebuildLibraryDerived();
+      renderLibraryMgmt();
+    });
   });
 
   libraryMgmtBody.querySelectorAll(".lib-delete-team").forEach((btn) => {
@@ -603,10 +605,12 @@ function renderLibraryMgmt() {
       if (TASK_LIBRARY[team].some((t) => t.id === id)) {
         alert("Ya existe una tarea similar. Usa un nombre diferente."); return;
       }
-      TASK_LIBRARY[team].push({ id, name, color });
-      saveLibraryToFirebase();
-      rebuildLibraryDerived();
-      renderLibraryMgmt();
+      requireAdmin("Guardar tarea", () => {
+        TASK_LIBRARY[team].push({ id, name, color });
+        saveLibraryToFirebase();
+        rebuildLibraryDerived();
+        renderLibraryMgmt();
+      });
     });
   });
 }
