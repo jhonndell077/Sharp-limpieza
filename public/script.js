@@ -385,7 +385,6 @@ realizadasBackdrop.addEventListener("click", () => realizadasPanel.classList.add
 // ── PIN gate ───────────────────────────────────────────────────────────
 
 function requireAdmin(description, onSuccess, onCancel) {
-  if (adminUnlocked) { onSuccess(); return; }
   pinGateSuccess = onSuccess;
   pinGateCancel  = onCancel || null;
   document.getElementById("pin-gate-title").textContent = description;
@@ -406,8 +405,6 @@ function closePinGate() {
 function confirmPinGate() {
   const input = document.getElementById("pin-gate-input");
   if (input.value === ADMIN_PIN) {
-    adminUnlocked = true;
-    libraryUnlocked = true;
     document.getElementById("pin-gate-overlay").classList.add("hidden");
     const cb = pinGateSuccess;
     pinGateSuccess = null;
@@ -487,15 +484,11 @@ document.getElementById("branch-add-new-btn").addEventListener("click", () => {
 
 function openLibraryModal() {
   libraryModalOverlay.classList.remove("hidden");
-  if (libraryUnlocked) {
-    showLibraryMgmt();
-  } else {
-    libraryPinView.classList.remove("hidden");
-    libraryMgmtView.classList.add("hidden");
-    libraryPinInput.value = "";
-    libraryPinError.classList.add("hidden");
-    setTimeout(() => libraryPinInput.focus(), 80);
-  }
+  libraryPinView.classList.remove("hidden");
+  libraryMgmtView.classList.add("hidden");
+  libraryPinInput.value = "";
+  libraryPinError.classList.add("hidden");
+  setTimeout(() => libraryPinInput.focus(), 80);
 }
 
 function closeLibraryModal() {
@@ -504,8 +497,6 @@ function closeLibraryModal() {
 
 function verifyLibraryPin() {
   if (libraryPinInput.value === ADMIN_PIN) {
-    adminUnlocked   = true;
-    libraryUnlocked = true;
     showLibraryMgmt();
   } else {
     libraryPinError.classList.remove("hidden");
