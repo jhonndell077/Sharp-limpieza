@@ -236,7 +236,8 @@ collaboratorForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const name = collaboratorInput.value.trim();
   if (!name) { collaboratorInput.focus(); return; }
-  if (!await requestActionPin("Agregar colaborador")) return;
+  const allowed = await requireAdmin("Agregar colaborador");
+  if (!allowed) return;
   state.collaborators.push({ id: createId(), name });
   collaboratorInput.value = "";
   saveState();
@@ -253,7 +254,8 @@ scheduleBody.addEventListener("click", async (event) => {
     const cid = removeBtn.getAttribute("data-remove-collaborator");
     const collaborator = state.collaborators.find((c) => c.id === cid);
     if (!collaborator) return;
-    if (!await requestActionPin(`Eliminar a ${collaborator.name}`)) return;
+    const allowed = await requireAdmin(`Eliminar a ${collaborator.name}`);
+    if (!allowed) return;
     if (!window.confirm(`¿Eliminar a ${collaborator.name} del calendario?`)) return;
     state.collaborators = state.collaborators.filter((c) => c.id !== cid);
     for (const key of Object.keys(state.tasks)) {
@@ -286,10 +288,8 @@ taskChecklist.addEventListener("change", () => {
 taskFree.addEventListener("change", async () => {
   if (!selectedCell) return;
   const newChecked = taskFree.checked;
-  if (!await requestActionPin("Marcar colaborador libre")) {
-    taskFree.checked = !newChecked;
-    return;
-  }
+  const allowed = await requireAdmin("Marcar colaborador libre");
+  if (!allowed) { taskFree.checked = !newChecked; return; }
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
   if (newChecked) {
     state.tasks[key] = { free: true, items: [] };
@@ -308,7 +308,8 @@ addTaskBtn.addEventListener("click", async () => {
   if (!team) return;
   const checked = Array.from(taskChecklist.querySelectorAll("input[type='checkbox']:checked:not(:disabled)"));
   if (checked.length === 0) return;
-  if (!await requestActionPin("Agregar tareas seleccionadas")) return;
+  const allowed = await requireAdmin("Agregar tareas seleccionadas");
+  if (!allowed) return;
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
   if (!state.tasks[key]) state.tasks[key] = { free: false, items: [] };
   const cellData = state.tasks[key];
@@ -331,10 +332,8 @@ modalTaskList.addEventListener("change", async (event) => {
   if (target.dataset.toggleDone !== undefined) {
     const index   = Number(target.dataset.toggleDone);
     const checked = target.checked;
-    if (!await requestActionPin("Marcar tarea como realizada")) {
-      target.checked = !checked;
-      return;
-    }
+    const allowed = await requireAdmin("Marcar tarea como realizada");
+    if (!allowed) { target.checked = !checked; return; }
     await toggleTaskDone(index, checked);
   }
 });
@@ -342,14 +341,16 @@ modalTaskList.addEventListener("change", async (event) => {
 modalTaskList.addEventListener("click", async (event) => {
   const btn = event.target.closest("[data-remove-task]");
   if (btn) {
-    if (!await requestActionPin("Eliminar tarea")) return;
+    const allowed = await requireAdmin("Eliminar tarea");
+    if (!allowed) return;
     removeTask(Number(btn.dataset.removeTask));
   }
 });
 
 clearTaskButton.addEventListener("click", async () => {
   if (!selectedCell) return;
-  if (!await requestActionPin("Limpiar todas las tareas del día")) return;
+  const allowed = await requireAdmin("Limpiar todas las tareas del día");
+  if (!allowed) return;
   const key = buildCellKey(selectedCell.collaboratorId, selectedCell.dayIndex);
   delete state.tasks[key];
   taskFree.checked = false;
@@ -367,17 +368,20 @@ modalOverlay.addEventListener("click", (event) => {
 
 // Week navigation
 weekPrevBtn.addEventListener("click", async () => {
-  if (!await requestActionPin("Semana anterior")) return;
+  const allowed = await requireAdmin("Semana anterior");
+  if (!allowed) return;
   navigateWeek(-1);
 });
 weekNextBtn.addEventListener("click", async () => {
-  if (!await requestActionPin("Semana siguiente")) return;
+  const allowed = await requireAdmin("Semana siguiente");
+  if (!allowed) return;
   navigateWeek(1);
 });
 
 document.getElementById("autofill-btn").addEventListener("click", async () => {
   if (!state.collaborators.length) { alert("Agrega al menos un colaborador antes de usar Auto-llenar."); return; }
-  if (!await requestActionPin("Auto-llenar semana")) return;
+  const allowed = await requireAdmin("Auto-llenar semana");
+  if (!allowed) return;
   if (!confirm("¿Llenar toda la semana con tareas al azar? Esto reemplazará las asignaciones existentes.")) return;
   autoFillCalendar();
 });
@@ -411,12 +415,10 @@ function requestActionPin(description) {
   });
 }
 
-// Backward-compatible wrapper for callback-style callers (library / branch management)
-function requireAdmin(description, onSuccess, onCancel) {
-  requestActionPin(description).then((allowed) => {
-    if (allowed) { if (onSuccess) onSuccess(); }
-    else         { if (onCancel)  onCancel();  }
-  });
+// Thin async wrapper — await it and check the return value.
+// No state stored anywhere; fresh PIN required on every call.
+async function requireAdmin(description) {
+  return requestActionPin(description);
 }
 
 function closePinGate() {
@@ -454,7 +456,8 @@ document.getElementById("pin-gate-input").addEventListener("keydown", (e) => {
 // ── Library Modal ──────────────────────────────────────────────────────
 
 document.getElementById("library-btn").addEventListener("click", async () => {
-  if (!await requestActionPin("Acceder a Gestión de Tareas")) return;
+  const allowed = await requireAdmin("Acceder a Gestión de Tareas");
+  if (!allowed) return;
   libraryModalOverlay.classList.remove("hidden");
   libraryPinView.classList.add("hidden");
   libraryMgmtView.classList.remove("hidden");
@@ -495,7 +498,7 @@ document.getElementById("branch-settings-done-btn").addEventListener("click", cl
 document.getElementById("branch-settings-overlay").addEventListener("click", (e) => {
   if (e.target === document.getElementById("branch-settings-overlay")) closeBranchSettings();
 });
-document.getElementById("branch-add-new-btn").addEventListener("click", () => {
+document.getElementById("branch-add-new-btn").addEventListener("click", async () => {
   const name = prompt("Nombre de la nueva sucursal:");
   if (!name || !name.trim()) return;
   const pin = prompt("Contraseña para esta sucursal:");
@@ -505,12 +508,12 @@ document.getElementById("branch-add-new-btn").addEventListener("click", () => {
   const id = name.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `branch-${Date.now()}`;
   if (branches.some((b) => b.id === id)) { alert("Ya existe una sucursal con nombre similar."); return; }
-  requireAdmin("Crear nueva sucursal", () => {
-    branches.push({ id, name: name.trim(), pin: trimmedPin });
-    saveBranchConfig();
-    renderBranchSettings();
-    renderBranchList();
-  });
+  const allowed = await requireAdmin("Crear nueva sucursal");
+  if (!allowed) return;
+  branches.push({ id, name: name.trim(), pin: trimmedPin });
+  saveBranchConfig();
+  renderBranchSettings();
+  renderBranchList();
 });
 
 function openLibraryModal() {
@@ -564,42 +567,42 @@ function renderLibraryMgmt() {
     document.getElementById("lib-new-team-input").value = "";
   });
 
-  document.getElementById("lib-save-team-btn").addEventListener("click", () => {
+  document.getElementById("lib-save-team-btn").addEventListener("click", async () => {
     const input = document.getElementById("lib-new-team-input");
     const name = input.value.trim();
     if (!name) { input.focus(); return; }
     if (TASK_LIBRARY[name]) { alert("Ya existe un equipo con ese nombre."); return; }
-    requireAdmin("Agregar nuevo equipo", () => {
-      TASK_LIBRARY[name] = [];
+    const allowed = await requireAdmin("Agregar nuevo equipo");
+    if (!allowed) return;
+    TASK_LIBRARY[name] = [];
+    saveLibraryToFirebase();
+    rebuildLibraryDerived();
+    renderLibraryMgmt();
+  });
+
+  libraryMgmtBody.querySelectorAll(".lib-delete-team").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const team = btn.dataset.team;
+      const allowed = await requireAdmin(`Eliminar equipo "${team}"`);
+      if (!allowed) return;
+      if (!confirm(`¿Eliminar el equipo "${team}" y todas sus tareas? Esta acción no se puede deshacer.`)) return;
+      delete TASK_LIBRARY[team];
       saveLibraryToFirebase();
       rebuildLibraryDerived();
       renderLibraryMgmt();
     });
   });
 
-  libraryMgmtBody.querySelectorAll(".lib-delete-team").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const team = btn.dataset.team;
-      requireAdmin(`Eliminar equipo "${team}"`, () => {
-        if (!confirm(`¿Eliminar el equipo "${team}" y todas sus tareas? Esta acción no se puede deshacer.`)) return;
-        delete TASK_LIBRARY[team];
-        saveLibraryToFirebase();
-        rebuildLibraryDerived();
-        renderLibraryMgmt();
-      });
-    });
-  });
-
   libraryMgmtBody.querySelectorAll(".lib-delete-task").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const { team, taskId } = btn.dataset;
       if (!TASK_LIBRARY[team]) return;
-      requireAdmin("Eliminar tarea de biblioteca", () => {
-        TASK_LIBRARY[team] = TASK_LIBRARY[team].filter((t) => t.id !== taskId);
-        saveLibraryToFirebase();
-        rebuildLibraryDerived();
-        renderLibraryMgmt();
-      });
+      const allowed = await requireAdmin("Eliminar tarea de biblioteca");
+      if (!allowed) return;
+      TASK_LIBRARY[team] = TASK_LIBRARY[team].filter((t) => t.id !== taskId);
+      saveLibraryToFirebase();
+      rebuildLibraryDerived();
+      renderLibraryMgmt();
     });
   });
 
@@ -622,7 +625,7 @@ function renderLibraryMgmt() {
   });
 
   libraryMgmtBody.querySelectorAll(".lib-save-task-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const form = btn.closest(".lib-add-task-form");
       const nameInput = form.querySelector(".lib-task-name-input");
       const colorSelect = form.querySelector(".lib-color-select");
@@ -636,12 +639,12 @@ function renderLibraryMgmt() {
       if (TASK_LIBRARY[team].some((t) => t.id === id)) {
         alert("Ya existe una tarea similar. Usa un nombre diferente."); return;
       }
-      requireAdmin("Guardar tarea", () => {
-        TASK_LIBRARY[team].push({ id, name, color });
-        saveLibraryToFirebase();
-        rebuildLibraryDerived();
-        renderLibraryMgmt();
-      });
+      const allowed = await requireAdmin("Guardar tarea");
+      if (!allowed) return;
+      TASK_LIBRARY[team].push({ id, name, color });
+      saveLibraryToFirebase();
+      rebuildLibraryDerived();
+      renderLibraryMgmt();
     });
   });
 }
@@ -1324,11 +1327,11 @@ function connectBoardSync(branchId) {
   });
 }
 
-function openBranchSettings() {
-  requireAdmin("Administrar sucursales", () => {
-    document.getElementById("branch-settings-overlay").classList.remove("hidden");
-    renderBranchSettings();
-  });
+async function openBranchSettings() {
+  const allowed = await requireAdmin("Administrar sucursales");
+  if (!allowed) return;
+  document.getElementById("branch-settings-overlay").classList.remove("hidden");
+  renderBranchSettings();
 }
 
 function closeBranchSettings() {
@@ -1356,34 +1359,34 @@ function renderBranchSettings() {
   `).join("");
 
   body.querySelectorAll(".branch-save-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const item = btn.closest(".branch-edit-item");
       const newName = item.querySelector(".branch-name-input").value.trim();
       const newPin  = item.querySelector(".branch-pin-input-field").value.trim();
       if (!newName || !newPin) { alert("Nombre y contraseña son requeridos."); return; }
       const branch = branches.find((b) => b.id === btn.getAttribute("data-branch-id"));
       if (!branch) return;
-      requireAdmin(`Cambiar datos de sucursal "${branch.name}"`, () => {
-        branch.name = newName;
-        branch.pin  = newPin;
-        saveBranchConfig();
-        renderBranchSettings();
-        renderBranchList();
-      });
+      const allowed = await requireAdmin(`Cambiar datos de sucursal "${branch.name}"`);
+      if (!allowed) return;
+      branch.name = newName;
+      branch.pin  = newPin;
+      saveBranchConfig();
+      renderBranchSettings();
+      renderBranchList();
     });
   });
 
   body.querySelectorAll(".branch-delete-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const branch = branches.find((b) => b.id === btn.getAttribute("data-branch-id"));
       if (!branch) return;
-      requireAdmin(`Eliminar sucursal "${branch.name}"`, () => {
-        if (!confirm(`¿Eliminar la sucursal "${branch.name}"? Esta acción no se puede deshacer.`)) return;
-        branches = branches.filter((b) => b.id !== branch.id);
-        saveBranchConfig();
-        renderBranchSettings();
-        renderBranchList();
-      });
+      const allowed = await requireAdmin(`Eliminar sucursal "${branch.name}"`);
+      if (!allowed) return;
+      if (!confirm(`¿Eliminar la sucursal "${branch.name}"? Esta acción no se puede deshacer.`)) return;
+      branches = branches.filter((b) => b.id !== branch.id);
+      saveBranchConfig();
+      renderBranchSettings();
+      renderBranchList();
     });
   });
 }
