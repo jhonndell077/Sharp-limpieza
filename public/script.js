@@ -1,7 +1,13 @@
 const DAYS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
 const STORAGE_KEY = "sharp_limpieza_board_v3";
-const REMOTE_BOARD_PATH = "boards/main";
 const SYNC_DEBOUNCE_MS = 250;
+
+const DEFAULT_BRANCHES = [
+  { id: "venezuela",  name: "Venezuela",  pin: "0001" },
+  { id: "naco",       name: "Naco",       pin: "0002" },
+  { id: "san-isidro", name: "San Isidro", pin: "0003" },
+  { id: "miami",      name: "Miami",      pin: "0004" },
+];
 
 // Paste here the URL of your deployed Google Apps Script web app
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyUvGPTSyPC_jzlsyEgfrVaS-gxug_Z5QYyFeOuHAEQ7vcysHZ6WPAyKafBPmfTtgiYGQ/exec";
@@ -135,12 +141,18 @@ let TEAM_NAMES = Object.keys(TASK_LIBRARY);
 const TASK_INDEX = buildTaskIndex();
 
 const ADMIN_PIN = "852347";
-let adminUnlocked    = false; // shared session unlock for all protected actions
+let adminUnlocked    = false;
 let libraryRef       = null;
 let libraryUnlocked  = false;
 let firebaseDB       = null;
 let pinGateSuccess   = null;
 let pinGateCancel    = null;
+
+// Branch state
+let branches         = [];
+let currentBranch    = null;
+let branchesConfigRef = null;
+let pendingBranchLogin = null;
 
 // DOM refs
 const collaboratorForm  = document.getElementById("collaborator-form");
@@ -193,7 +205,7 @@ const libraryMgmtBody      = document.getElementById("library-mgmt-body");
 let currentWeekStart  = getActiveWeekMondayStr();
 let isOnAutoWeek      = true;
 
-let state = loadState() || createInitialState();
+let state = createInitialState(); // populated after branch is selected
 let selectedCell = null;
 let remoteBoardRef = null;
 let remoteSaveTimer = null;
@@ -206,10 +218,8 @@ let photoBlob         = null;
 let photoModalResolve = null;
 let pendingPhotoMeta  = null;
 
-updateTeamSelectors();
-renderTable();
 renderWeekLabel();
-initRemoteSync();
+initFirebaseConnection(); // loads branches, library; shows branch selector
 
 // Auto-rollover: check every 60 s if we need to advance the week
 setInterval(() => {
@@ -435,6 +445,44 @@ document.getElementById("library-add-team-btn").addEventListener("click", () => 
   const form = document.getElementById("lib-new-team-form");
   form.classList.add("visible");
   document.getElementById("lib-new-team-input").focus();
+});
+
+// ── Branch system event listeners ─────────────────────────────────────
+
+document.getElementById("branch-switch-btn").addEventListener("click", () => {
+  renderBranchList();
+  showBranchSelector();
+  adminUnlocked = false;
+});
+
+document.getElementById("branch-settings-btn").addEventListener("click", openBranchSettings);
+
+document.getElementById("branch-pin-confirm-btn").addEventListener("click", confirmBranchPin);
+document.getElementById("branch-pin-cancel-btn").addEventListener("click", closeBranchPinModal);
+document.getElementById("branch-pin-close-btn").addEventListener("click", closeBranchPinModal);
+document.getElementById("branch-pin-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") confirmBranchPin();
+});
+
+document.getElementById("branch-settings-close-btn").addEventListener("click", closeBranchSettings);
+document.getElementById("branch-settings-done-btn").addEventListener("click", closeBranchSettings);
+document.getElementById("branch-settings-overlay").addEventListener("click", (e) => {
+  if (e.target === document.getElementById("branch-settings-overlay")) closeBranchSettings();
+});
+document.getElementById("branch-add-new-btn").addEventListener("click", () => {
+  const name = prompt("Nombre de la nueva sucursal:");
+  if (!name || !name.trim()) return;
+  const pin = prompt("Contraseña para esta sucursal:");
+  if (pin === null) return;
+  const trimmedPin = pin.trim();
+  if (!trimmedPin) { alert("La contraseña no puede estar vacía."); return; }
+  const id = name.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `branch-${Date.now()}`;
+  if (branches.some((b) => b.id === id)) { alert("Ya existe una sucursal con nombre similar."); return; }
+  branches.push({ id, name: name.trim(), pin: trimmedPin });
+  saveBranchConfig();
+  renderBranchSettings();
+  renderBranchList();
 });
 
 function openLibraryModal() {
@@ -984,9 +1032,15 @@ function createInitialState() {
   return { collaborators: [], tasks: {} };
 }
 
+function getBoardStorageKey() {
+  return currentBranch ? `${STORAGE_KEY}_${currentBranch.id}` : null;
+}
+
 function loadState() {
+  const key = getBoardStorageKey();
+  if (!key) return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     return normalizeState(JSON.parse(raw));
   } catch (_) {
@@ -995,8 +1049,9 @@ function loadState() {
 }
 
 function saveState(options = {}) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  if (!options.localOnly && !isApplyingRemoteState) queueRemoteSave();
+  const key = getBoardStorageKey();
+  if (key) localStorage.setItem(key, JSON.stringify(state));
+  if (!options.localOnly && !isApplyingRemoteState && currentBranch) queueRemoteSave();
 }
 
 function normalizeState(parsed) {
@@ -1063,18 +1118,20 @@ function normalizeTaskItem(value) {
   return null;
 }
 
-// ── Firebase sync ─────────────────────────────────────────────────────
+// ── Firebase sync & branch system ────────────────────────────────────
 
-function initRemoteSync() {
+function initFirebaseConnection() {
   if (!window.firebase || typeof firebase.initializeApp !== "function" || typeof firebase.database !== "function") {
     setSyncStatus("Modo local", "offline");
+    branches = [...DEFAULT_BRANCHES];
+    showBranchSelector();
+    renderBranchList();
     return;
   }
   try {
     const app = firebase.apps && firebase.apps.length > 0 ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
     const database = firebase.database(app);
     firebaseDB = database;
-    remoteBoardRef = database.ref(REMOTE_BOARD_PATH);
 
     if (typeof firebase.storage === "function") {
       try { firebaseStorage = firebase.storage(app); } catch (_) {}
@@ -1083,42 +1140,213 @@ function initRemoteSync() {
     setSyncStatus("Conectando...", "busy");
 
     database.ref(".info/connected").on("value", (snap) => {
-      setSyncStatus(snap.val() === true ? (hasRemoteSnapshot ? "Sincronizado" : "Conectado") : "Sin conexion",
-                    snap.val() === true ? "online" : "offline");
+      if (currentBranch) {
+        setSyncStatus(
+          snap.val() === true ? (hasRemoteSnapshot ? "Sincronizado" : "Conectado") : "Sin conexion",
+          snap.val() === true ? "online" : "offline"
+        );
+      }
     });
 
-    remoteBoardRef.on("value", (snap) => {
-      hasRemoteSnapshot = true;
-      const raw = snap.val();
-      if (raw === null) {
-        // No data in Firebase yet — upload current local state
-        setSyncStatus("Subiendo datos iniciales...", "busy");
-        queueRemoteSave({ immediate: true });
-        return;
-      }
-      const remoteState = parseRemoteState(raw);
-      if (!remoteState) {
-        // Data exists but couldn't be parsed — do NOT overwrite with empty state
-        console.warn("No se pudo interpretar el estado remoto:", raw);
-        setSyncStatus("Error de formato", "error");
-        return;
-      }
-      isApplyingRemoteState = true;
-      state = remoteState;
-      saveState({ localOnly: true });
-      isApplyingRemoteState = false;
-      updateTeamSelectors();
-      renderTable();
-      setSyncStatus("Sincronizado", "online");
-    }, (err) => {
-      console.error("Firebase sync error", err);
-      setSyncStatus("Error de sincronizacion", "error");
-    });
     initLibrarySync();
+    initBranchConfigSync();
   } catch (err) {
     console.error("Firebase init error", err);
     setSyncStatus("Modo local", "offline");
+    branches = [...DEFAULT_BRANCHES];
+    showBranchSelector();
+    renderBranchList();
   }
+}
+
+function initBranchConfigSync() {
+  if (!firebaseDB) return;
+  branchesConfigRef = firebaseDB.ref("branchConfig");
+  branchesConfigRef.on("value", (snap) => {
+    const json = snap.val();
+    if (json) {
+      try { branches = JSON.parse(json); } catch (_) { branches = [...DEFAULT_BRANCHES]; }
+    } else {
+      branches = [...DEFAULT_BRANCHES];
+      branchesConfigRef.set(JSON.stringify(branches)).catch(console.error);
+    }
+    renderBranchList();
+    if (currentBranch) {
+      const updated = branches.find((b) => b.id === currentBranch.id);
+      if (updated) {
+        currentBranch = updated;
+        document.getElementById("header-branch-name").textContent = currentBranch.name;
+      }
+    }
+  });
+  showBranchSelector();
+}
+
+function showBranchSelector() {
+  document.getElementById("branch-selector").classList.remove("hidden");
+}
+
+function hideBranchSelector() {
+  document.getElementById("branch-selector").classList.add("hidden");
+}
+
+function renderBranchList() {
+  const list = document.getElementById("branch-list");
+  if (!branches.length) {
+    list.innerHTML = '<p class="branch-loading">Sin sucursales configuradas.</p>';
+    return;
+  }
+  list.innerHTML = branches.map((branch) => `
+    <button type="button" class="branch-card" data-branch-id="${escapeHtml(branch.id)}">
+      <span class="branch-card-name">${escapeHtml(branch.name)}</span>
+      <span class="branch-card-arrow">›</span>
+    </button>
+  `).join("");
+  list.querySelectorAll(".branch-card").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const branch = branches.find((b) => b.id === btn.getAttribute("data-branch-id"));
+      if (branch) openBranchPinModal(branch);
+    });
+  });
+}
+
+function openBranchPinModal(branch) {
+  pendingBranchLogin = branch;
+  document.getElementById("branch-pin-name").textContent = branch.name;
+  document.getElementById("branch-pin-input").value = "";
+  document.getElementById("branch-pin-error").classList.add("hidden");
+  document.getElementById("branch-pin-overlay").classList.remove("hidden");
+  setTimeout(() => document.getElementById("branch-pin-input").focus(), 80);
+}
+
+function closeBranchPinModal() {
+  document.getElementById("branch-pin-overlay").classList.add("hidden");
+  pendingBranchLogin = null;
+}
+
+function confirmBranchPin() {
+  const input = document.getElementById("branch-pin-input");
+  if (!pendingBranchLogin) return;
+  if (input.value === pendingBranchLogin.pin) {
+    const branch = pendingBranchLogin;
+    closeBranchPinModal();
+    enterBranch(branch);
+  } else {
+    document.getElementById("branch-pin-error").classList.remove("hidden");
+    input.value = "";
+    input.focus();
+  }
+}
+
+function enterBranch(branch) {
+  currentBranch = branch;
+  adminUnlocked = false;
+  document.getElementById("header-branch-name").textContent = branch.name;
+  hideBranchSelector();
+  state = loadState() || createInitialState();
+  updateTeamSelectors();
+  renderTable();
+  if (firebaseDB) {
+    connectBoardSync(branch.id);
+  } else {
+    setSyncStatus("Modo local", "offline");
+  }
+}
+
+function connectBoardSync(branchId) {
+  if (remoteBoardRef) { remoteBoardRef.off(); remoteBoardRef = null; }
+  hasRemoteSnapshot = false;
+  remoteBoardRef = firebaseDB.ref(`boards/${branchId}`);
+  setSyncStatus("Conectando...", "busy");
+  remoteBoardRef.on("value", (snap) => {
+    hasRemoteSnapshot = true;
+    const raw = snap.val();
+    if (raw === null) {
+      setSyncStatus("Subiendo datos iniciales...", "busy");
+      queueRemoteSave({ immediate: true });
+      return;
+    }
+    const remoteState = parseRemoteState(raw);
+    if (!remoteState) {
+      console.warn("No se pudo interpretar el estado remoto:", raw);
+      setSyncStatus("Error de formato", "error");
+      return;
+    }
+    isApplyingRemoteState = true;
+    state = remoteState;
+    saveState({ localOnly: true });
+    isApplyingRemoteState = false;
+    updateTeamSelectors();
+    renderTable();
+    setSyncStatus("Sincronizado", "online");
+  }, (err) => {
+    console.error("Firebase sync error", err);
+    setSyncStatus("Error de sincronizacion", "error");
+  });
+}
+
+function openBranchSettings() {
+  requireAdmin("Administrar sucursales", () => {
+    document.getElementById("branch-settings-overlay").classList.remove("hidden");
+    renderBranchSettings();
+  });
+}
+
+function closeBranchSettings() {
+  document.getElementById("branch-settings-overlay").classList.add("hidden");
+}
+
+function renderBranchSettings() {
+  const body = document.getElementById("branch-settings-body");
+  if (!branches.length) {
+    body.innerHTML = '<p style="color:#888;text-align:center;padding:1rem;">Sin sucursales.</p>';
+    return;
+  }
+  body.innerHTML = branches.map((branch) => `
+    <div class="branch-edit-item">
+      <div class="branch-edit-header">
+        <strong class="branch-edit-title">${escapeHtml(branch.name)}</strong>
+        <button type="button" class="branch-delete-btn" data-branch-id="${escapeHtml(branch.id)}">🗑</button>
+      </div>
+      <div class="branch-edit-form">
+        <input type="text" class="branch-edit-input branch-name-input" placeholder="Nombre" value="${escapeHtml(branch.name)}" maxlength="40">
+        <input type="text" class="branch-edit-input branch-pin-input-field" placeholder="Contraseña" value="${escapeHtml(branch.pin)}" maxlength="20">
+        <button type="button" class="branch-save-btn" data-branch-id="${escapeHtml(branch.id)}">Guardar</button>
+      </div>
+    </div>
+  `).join("");
+
+  body.querySelectorAll(".branch-save-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const item = btn.closest(".branch-edit-item");
+      const newName = item.querySelector(".branch-name-input").value.trim();
+      const newPin  = item.querySelector(".branch-pin-input-field").value.trim();
+      if (!newName || !newPin) { alert("Nombre y contraseña son requeridos."); return; }
+      const branch = branches.find((b) => b.id === btn.getAttribute("data-branch-id"));
+      if (!branch) return;
+      branch.name = newName;
+      branch.pin  = newPin;
+      saveBranchConfig();
+      renderBranchSettings();
+      renderBranchList();
+    });
+  });
+
+  body.querySelectorAll(".branch-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const branch = branches.find((b) => b.id === btn.getAttribute("data-branch-id"));
+      if (!branch) return;
+      if (!confirm(`¿Eliminar la sucursal "${branch.name}"?`)) return;
+      branches = branches.filter((b) => b.id !== branch.id);
+      saveBranchConfig();
+      renderBranchSettings();
+      renderBranchList();
+    });
+  });
+}
+
+function saveBranchConfig() {
+  if (branchesConfigRef) branchesConfigRef.set(JSON.stringify(branches)).catch(console.error);
 }
 
 function parseRemoteState(value) {

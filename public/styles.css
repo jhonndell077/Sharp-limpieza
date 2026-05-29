@@ -1254,3 +1254,161 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
   width: 100%;
 }
 .lib-show-add-task:hover { background: #f0faf5; }
+
+/* ── Branch selector ─────────────────────────────────────── */
+
+.branch-selector-overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(150deg, #1b4332 0%, #2d6a4f 60%, #40916c 100%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.branch-selector-overlay.hidden { display: none; }
+
+.branch-selector-box {
+  background: #fff;
+  border-radius: 18px;
+  padding: 2rem 1.75rem 1.5rem;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+}
+
+.branch-selector-logo h1 {
+  margin: 0;
+  font-size: 1.45rem;
+  color: #1b4332;
+}
+.branch-selector-logo p {
+  margin: 0.2rem 0 1.4rem;
+  color: #777;
+  font-size: 0.85rem;
+}
+
+.branch-selector-subtitle {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+}
+
+.branch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 1.25rem;
+}
+
+.branch-loading {
+  text-align: center;
+  color: #aaa;
+  font-size: 0.9rem;
+  padding: 1rem 0;
+  margin: 0;
+}
+
+.branch-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: #f0f7ee;
+  border: 2px solid #d8e3d5;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  min-height: 0;
+  color: #1b4332;
+}
+.branch-card:hover { border-color: #40916c; background: #e4f2e2; }
+
+.branch-card-name { font-weight: 700; font-size: 1rem; }
+.branch-card-arrow { font-size: 1.3rem; opacity: 0.5; }
+
+.branch-settings-link {
+  background: none !important;
+  border: none;
+  color: #888;
+  font-size: 0.8rem;
+  font-weight: 400;
+  cursor: pointer;
+  padding: 0.3rem 0;
+  text-decoration: underline;
+  width: 100%;
+  text-align: center;
+  min-height: 0 !important;
+  display: block;
+}
+.branch-settings-link:hover { color: #444; filter: none; }
+
+/* ── Branch settings edit forms ──────────────────────────── */
+
+.branch-edit-form {
+  padding: 0.6rem 0.9rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.branch-edit-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #666;
+  margin-top: 0.25rem;
+}
+.branch-edit-input {
+  width: 100%;
+  padding: 0.38rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.branch-edit-item {
+  border: 1px solid #d8e3d5;
+  border-radius: 10px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+.branch-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.9rem;
+  background: #f0f7ee;
+  border-bottom: 1px solid #d8e3d5;
+}
+.branch-edit-title { font-size: 0.95rem; color: #1b4332; }
+.branch-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 5px;
+  color: #b94a4a;
+  min-height: 0 !important;
+}
+.branch-delete-btn:hover { background: #fde8e8; }
+.branch-save-btn {
+  background: #4e8137;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  align-self: flex-start;
+  min-height: 0 !important;
+}
+.branch-save-btn:hover { background: #3a6128; }

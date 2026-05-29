@@ -2,8 +2,13 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "branchConfig": {
+      ".read": true,
+      ".write": true,
+      ".validate": "newData.isString()"
+    },
     "boards": {
-      "main": {
+      "$branchId": {
         ".read": true,
         ".write": true,
         ".validate": "newData.hasChildren(['stateJson']) && newData.child('stateJson').isString()"

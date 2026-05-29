@@ -4,20 +4,78 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=18">
+  <link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
   <header class="app-header">
     <div class="header-top">
       <div class="header-left">
         <h1>Sharp de Limpieza</h1>
-        <p>Calendario de ejecucion diaria con control de pendientes y realizadas.</p>
-        <span id="sync-status" class="sync-status" data-state="busy">Conectando...</span>
+        <p>Sucursal: <strong id="header-branch-name">—</strong></p>
+        <span id="sync-status" class="sync-status" data-state="busy">Selecciona sucursal...</span>
       </div>
+      <button type="button" id="branch-switch-btn" class="realizadas-open-btn">🏢 Sucursal</button>
       <button type="button" id="realizadas-btn" class="realizadas-open-btn">📋 Realizadas</button>
       <button type="button" id="library-btn" class="realizadas-open-btn">⚙️ Tareas</button>
     </div>
   </header>
+
+  <!-- Pantalla de selección de sucursal -->
+  <div id="branch-selector" class="branch-selector-overlay">
+    <div class="branch-selector-box">
+      <div class="branch-selector-logo">
+        <h1>Sharp de Limpieza</h1>
+        <p>Sistema de gestión de limpieza</p>
+      </div>
+      <h2 class="branch-selector-subtitle">Selecciona tu sucursal</h2>
+      <div id="branch-list" class="branch-list">
+        <p class="branch-loading">Cargando sucursales...</p>
+      </div>
+      <button type="button" id="branch-settings-btn" class="branch-settings-link">⚙ Administrar sucursales</button>
+    </div>
+  </div>
+
+  <!-- Modal: PIN de acceso a sucursal -->
+  <div id="branch-pin-overlay" class="modal-overlay hidden">
+    <div class="modal-card pin-gate-card">
+      <div class="modal-head">
+        <div>
+          <span class="modal-kicker">Acceso a sucursal</span>
+          <strong id="branch-pin-name">—</strong>
+        </div>
+        <button type="button" id="branch-pin-close-btn" class="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body library-pin-body">
+        <p class="library-pin-desc">Ingresa la contraseña de esta sucursal.</p>
+        <input type="password" id="branch-pin-input" class="library-pin-input" maxlength="6" placeholder="Contraseña" inputmode="numeric" autocomplete="off">
+        <p id="branch-pin-error" class="library-pin-error hidden">Contraseña incorrecta.</p>
+      </div>
+      <div class="modal-foot">
+        <button type="button" id="branch-pin-confirm-btn">Entrar</button>
+        <button type="button" id="branch-pin-cancel-btn" class="secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Administrar sucursales (admin) -->
+  <div id="branch-settings-overlay" class="modal-overlay hidden">
+    <div class="modal-card library-modal-card">
+      <div id="branch-settings-view" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
+        <div class="modal-head">
+          <div>
+            <span class="modal-kicker">Configuración</span>
+            <strong>Sucursales</strong>
+          </div>
+          <button type="button" id="branch-settings-close-btn" class="modal-close-btn">✕</button>
+        </div>
+        <div id="branch-settings-body" class="modal-body library-mgmt-body"></div>
+        <div class="modal-foot">
+          <button type="button" id="branch-add-new-btn">+ Nueva sucursal</button>
+          <button type="button" id="branch-settings-done-btn" class="secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <main class="layout">
     <section class="board-section">
@@ -210,6 +268,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
-  <script src="script.js?v=18"></script>
+  <script src="script.js?v=20"></script>
 </body>
 </html>
