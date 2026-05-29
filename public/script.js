@@ -330,7 +330,13 @@ addTaskBtn.addEventListener("click", () => {
 modalTaskList.addEventListener("change", (event) => {
   const target = event.target;
   if (target.dataset.toggleDone !== undefined) {
-    toggleTaskDone(Number(target.dataset.toggleDone), target.checked);
+    const index   = Number(target.dataset.toggleDone);
+    const checked = target.checked;
+    requireAdmin("Marcar tarea como realizada", () => {
+      toggleTaskDone(index, checked);
+    }, () => {
+      target.checked = !checked; // revert checkbox if PIN cancelled
+    });
   }
 });
 
@@ -383,6 +389,8 @@ realizadasBackdrop.addEventListener("click", () => realizadasPanel.classList.add
 // ── PIN gate ───────────────────────────────────────────────────────────
 
 function requireAdmin(description, onSuccess, onCancel) {
+  // Ignore if gate is already open — prevents rapid-click overwriting the active callback
+  if (!document.getElementById("pin-gate-overlay").classList.contains("hidden")) return;
   pinGateSuccess = onSuccess;
   pinGateCancel  = onCancel || null;
   document.getElementById("pin-gate-title").textContent = description;
@@ -674,7 +682,9 @@ function initLibrarySync() {
         for (const task of tasks) TASK_INDEX.set(`${team}__${task.id}`, task);
       }
       updateTeamSelectors();
-      renderTable(); // re-render chips with proper task names now that library loaded
+      if (modalOverlay.classList.contains("hidden")) {
+        renderTable(); // re-render chips with proper task names now that library loaded
+      }
       if (!modalOverlay.classList.contains("hidden")) {
         renderTaskChecklist(taskTeam.value);
       }
@@ -728,6 +738,7 @@ async function openPhotoModal(taskLabel, team, taskName) {
   photoCaptureBtn.style.display = "";
   photoConfirmBtn.style.display = "none";
   photoRetakeBtn.style.display  = "none";
+  photoCancelBtn.style.display  = "";
   photoModalOverlay.classList.remove("hidden");
 
   try {
@@ -911,8 +922,9 @@ async function toggleTaskDone(index, done) {
   }
 
   // ── Foto de evidencia REQUERIDA antes de marcar ──
-  const capturedCollabId = selectedCell.collaboratorId;
-  const capturedDayIndex = selectedCell.dayIndex;
+  const capturedCollabId  = selectedCell.collaboratorId;
+  const capturedDayIndex  = selectedCell.dayIndex;
+  const capturedWeekStart = currentWeekStart; // capture before async photo modal
   const meta  = resolveTaskMeta(cellData.items[index]);
   const label = `${meta.taskName} · ${DAYS[capturedDayIndex]}`;
   const photoUrl = await openPhotoModal(label, meta.team, meta.taskName);
@@ -924,7 +936,7 @@ async function toggleTaskDone(index, done) {
     return;
   }
 
-  const k  = buildCellKey(capturedCollabId, capturedDayIndex);
+  const k  = `${capturedWeekStart}__${capturedCollabId}__${capturedDayIndex}`;
   const cd = state.tasks[k];
   if (!cd?.items?.[index]) return;
   cd.items[index].done             = true;
@@ -1734,5 +1746,5 @@ function escapeHtml(value) {
 function isSafeUrl(url) {
   if (!url || typeof url !== "string") return false;
   const lower = url.trimStart().toLowerCase();
-  return lower.startsWith("https://") || lower.startsWith("data:image/");
+  return lower.startsWith("https://") || /^data:image\/(jpeg|png|webp);base64,/.test(lower);
 }
