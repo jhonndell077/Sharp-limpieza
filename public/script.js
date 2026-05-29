@@ -141,9 +141,7 @@ let TEAM_NAMES = Object.keys(TASK_LIBRARY);
 const TASK_INDEX = buildTaskIndex();
 
 const ADMIN_PIN = "852347";
-let adminUnlocked    = false;
 let libraryRef       = null;
-let libraryUnlocked  = false;
 let firebaseDB       = null;
 let pinGateSuccess   = null;
 let pinGateCancel    = null;
@@ -449,7 +447,6 @@ document.getElementById("library-add-team-btn").addEventListener("click", () => 
 document.getElementById("branch-switch-btn").addEventListener("click", () => {
   renderBranchList();
   showBranchSelector();
-  adminUnlocked = false;
 });
 
 document.getElementById("branch-settings-btn").addEventListener("click", openBranchSettings);
@@ -1235,7 +1232,6 @@ function confirmBranchPin() {
 
 function enterBranch(branch) {
   currentBranch = branch;
-  adminUnlocked = false;
   document.getElementById("header-branch-name").textContent = branch.name;
   hideBranchSelector();
   state = loadState() || createInitialState();
