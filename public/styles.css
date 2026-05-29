@@ -773,6 +773,7 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
 /* ── Evidencia fotográfica ───────────────────────────────── */
 
 .photo-modal-overlay { z-index: 210; }
+#pin-gate-overlay    { z-index: 1000; }
 .photo-modal-card    { max-width: 440px; }
 
 .photo-modal-body {

@@ -435,7 +435,14 @@ document.getElementById("pin-gate-input").addEventListener("keydown", (e) => {
 
 // ── Library Modal ──────────────────────────────────────────────────────
 
-document.getElementById("library-btn").addEventListener("click", openLibraryModal);
+document.getElementById("library-btn").addEventListener("click", () => {
+  requireAdmin("Acceder a Gestión de Tareas", () => {
+    libraryModalOverlay.classList.remove("hidden");
+    libraryPinView.classList.add("hidden");
+    libraryMgmtView.classList.remove("hidden");
+    renderLibraryMgmt();
+  });
+});
 document.getElementById("library-pin-close-btn").addEventListener("click", closeLibraryModal);
 document.getElementById("library-pin-cancel-btn").addEventListener("click", closeLibraryModal);
 document.getElementById("library-mgmt-close-btn").addEventListener("click", closeLibraryModal);
@@ -500,6 +507,10 @@ function openLibraryModal() {
 
 function closeLibraryModal() {
   libraryModalOverlay.classList.add("hidden");
+  libraryPinView.classList.add("hidden");
+  libraryMgmtView.classList.add("hidden");
+  libraryPinInput.value = "";
+  libraryPinError.classList.add("hidden");
 }
 
 function verifyLibraryPin() {
