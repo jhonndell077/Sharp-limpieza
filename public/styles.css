@@ -151,6 +151,15 @@ body, main, section { min-width: 0; }
 }
 .autofill-btn:hover { filter: brightness(1.12); }
 
+.clear-users-btn {
+  background: #c0392b;
+  font-size: 0.88rem;
+  padding: 0.55rem 0.9rem;
+  white-space: nowrap;
+  align-self: flex-end;
+}
+.clear-users-btn:hover { filter: brightness(1.1); }
+
 /* ── PIN gate modal ──────────────────────────────────────── */
 .pin-gate-card { max-width: 340px; }
 

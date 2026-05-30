@@ -409,6 +409,18 @@ document.getElementById("autofill-btn").addEventListener("click", async () => {
   autoFillCalendar();
 });
 
+document.getElementById("clear-all-users-btn").addEventListener("click", async () => {
+  if (!state.collaborators.length) { alert("No hay colaboradores registrados."); return; }
+  const allowed = await requireAdmin("Eliminar todos los colaboradores");
+  if (!allowed) return;
+  if (!confirm(`¿Eliminar los ${state.collaborators.length} colaboradores y todas sus tareas? Esta acción no se puede deshacer.`)) return;
+  state.collaborators = [];
+  state.tasks = {};
+  if (selectedCell) closeModal();
+  saveState();
+  renderTable();
+});
+
 // Realizadas panel
 realizadasBtn.addEventListener("click", () => {
   renderRealizadasPanel();
