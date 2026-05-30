@@ -340,8 +340,6 @@ modalTaskList.addEventListener("change", async (event) => {
   if (target.dataset.toggleDone !== undefined) {
     const index   = Number(target.dataset.toggleDone);
     const checked = target.checked;
-    const allowed = await requireAdmin("Marcar tarea como realizada");
-    if (!allowed) { target.checked = !checked; return; }
     await toggleTaskDone(index, checked);
   }
 });
