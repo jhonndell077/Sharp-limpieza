@@ -152,6 +152,10 @@ let currentBranch    = null;
 let branchesConfigRef = null;
 let pendingBranchLogin = null;
 
+let _pinFailCount      = 0;   // wrong attempts since last success
+let _pinLockUntil      = 0;   // timestamp ms until PIN gate is unlocked
+let _pinCountdownTimer = null; // interval id for lockout countdown
+
 // DOM refs
 const collaboratorForm  = document.getElementById("collaborator-form");
 const collaboratorInput = document.getElementById("collaborator-name");
@@ -396,9 +400,8 @@ realizadasBackdrop.addEventListener("click", () => realizadasPanel.classList.add
 
 // ── PIN gate ───────────────────────────────────────────────────────────
 
-// Core: shows the PIN gate and returns a Promise that resolves to true (correct PIN)
-// or false (wrong PIN, cancelled, or gate already open).
-// No storage of any kind — every call requires fresh PIN entry.
+// Core: shows the PIN gate and returns a Promise<boolean>.
+// No storage anywhere — fresh PIN required every call.
 function requestActionPin(description) {
   const overlay = document.getElementById("pin-gate-overlay");
   if (!overlay.classList.contains("hidden")) return Promise.resolve(false);
@@ -410,8 +413,13 @@ function requestActionPin(description) {
     document.getElementById("pin-gate-desc").textContent  = "Ingresa el código de acceso para continuar.";
     document.getElementById("pin-gate-input").value       = "";
     document.getElementById("pin-gate-error").classList.add("hidden");
+    updatePinDots(0);
     overlay.classList.remove("hidden");
-    setTimeout(() => document.getElementById("pin-gate-input").focus(), 80);
+    if (Date.now() < _pinLockUntil) {
+      showPinLockdown();
+    } else {
+      setTimeout(() => document.getElementById("pin-gate-input").focus(), 80);
+    }
   });
 }
 
@@ -422,25 +430,90 @@ async function requireAdmin(description) {
 }
 
 function closePinGate() {
+  window.clearInterval(_pinCountdownTimer);
+  _pinCountdownTimer = null;
   document.getElementById("pin-gate-overlay").classList.add("hidden");
+  document.getElementById("pin-gate-input").disabled = false;
+  updatePinDots(0);
   if (pinGateCancel) { pinGateCancel(); }
   pinGateSuccess = null;
   pinGateCancel  = null;
 }
 
 function confirmPinGate() {
-  const input = document.getElementById("pin-gate-input");
+  if (Date.now() < _pinLockUntil) { showPinLockdown(); return; }
+
+  const input   = document.getElementById("pin-gate-input");
+  const errorEl = document.getElementById("pin-gate-error");
+
+  if (input.value.length < 6) {
+    errorEl.textContent = "El código debe tener exactamente 6 dígitos.";
+    errorEl.classList.remove("hidden");
+    shakePinInput();
+    return;
+  }
+
   if (input.value === ADMIN_PIN) {
+    _pinFailCount = 0;
+    window.clearInterval(_pinCountdownTimer);
+    _pinCountdownTimer = null;
     document.getElementById("pin-gate-overlay").classList.add("hidden");
+    document.getElementById("pin-gate-input").disabled = false;
+    updatePinDots(0);
     const cb = pinGateSuccess;
     pinGateSuccess = null;
     pinGateCancel  = null;
     if (cb) cb();
   } else {
-    document.getElementById("pin-gate-error").classList.remove("hidden");
+    _pinFailCount++;
     input.value = "";
+    updatePinDots(0);
     input.focus();
+    if (_pinFailCount >= 3) {
+      _pinLockUntil = Date.now() + 30_000;
+      _pinFailCount = 0;
+      showPinLockdown();
+    } else {
+      const left = 3 - _pinFailCount;
+      errorEl.textContent = `Código incorrecto. ${left} intento${left !== 1 ? "s" : ""} restante${left !== 1 ? "s" : ""}.`;
+      errorEl.classList.remove("hidden");
+      shakePinInput();
+    }
   }
+}
+
+function shakePinInput() {
+  const input = document.getElementById("pin-gate-input");
+  input.classList.add("pin-error-shake");
+  setTimeout(() => input.classList.remove("pin-error-shake"), 400);
+}
+
+function updatePinDots(length) {
+  document.querySelectorAll("#pin-gate-dots span").forEach((dot, i) => {
+    dot.classList.toggle("dot-filled", i < length);
+  });
+}
+
+function showPinLockdown() {
+  const input   = document.getElementById("pin-gate-input");
+  const errorEl = document.getElementById("pin-gate-error");
+  input.disabled = true;
+  input.value    = "";
+  updatePinDots(0);
+  window.clearInterval(_pinCountdownTimer);
+  _pinCountdownTimer = setInterval(() => {
+    const secs = Math.ceil((_pinLockUntil - Date.now()) / 1000);
+    if (secs <= 0) {
+      window.clearInterval(_pinCountdownTimer);
+      _pinCountdownTimer = null;
+      input.disabled = false;
+      errorEl.classList.add("hidden");
+      input.focus();
+      return;
+    }
+    errorEl.textContent = `Demasiados intentos fallidos. Espera ${secs}s.`;
+    errorEl.classList.remove("hidden");
+  }, 500);
 }
 
 document.getElementById("pin-gate-confirm-btn").addEventListener("click", confirmPinGate);
@@ -451,6 +524,11 @@ document.getElementById("pin-gate-overlay").addEventListener("click", (e) => {
 });
 document.getElementById("pin-gate-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") confirmPinGate();
+});
+document.getElementById("pin-gate-input").addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+  updatePinDots(e.target.value.length);
+  if (e.target.value.length === 6) confirmPinGate();
 });
 
 // ── Library Modal ──────────────────────────────────────────────────────
@@ -467,10 +545,6 @@ document.getElementById("library-pin-close-btn").addEventListener("click", close
 document.getElementById("library-pin-cancel-btn").addEventListener("click", closeLibraryModal);
 document.getElementById("library-mgmt-close-btn").addEventListener("click", closeLibraryModal);
 document.getElementById("library-mgmt-cancel-btn").addEventListener("click", closeLibraryModal);
-document.getElementById("library-pin-verify-btn").addEventListener("click", verifyLibraryPin);
-document.getElementById("library-pin-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") verifyLibraryPin();
-});
 document.getElementById("library-add-team-btn").addEventListener("click", () => {
   const form = document.getElementById("lib-new-team-form");
   form.classList.add("visible");
@@ -516,37 +590,12 @@ document.getElementById("branch-add-new-btn").addEventListener("click", async ()
   renderBranchList();
 });
 
-function openLibraryModal() {
-  libraryModalOverlay.classList.remove("hidden");
-  libraryPinView.classList.remove("hidden");
-  libraryMgmtView.classList.add("hidden");
-  libraryPinInput.value = "";
-  libraryPinError.classList.add("hidden");
-  setTimeout(() => libraryPinInput.focus(), 80);
-}
-
 function closeLibraryModal() {
   libraryModalOverlay.classList.add("hidden");
   libraryPinView.classList.add("hidden");
   libraryMgmtView.classList.add("hidden");
   libraryPinInput.value = "";
   libraryPinError.classList.add("hidden");
-}
-
-function verifyLibraryPin() {
-  if (libraryPinInput.value === ADMIN_PIN) {
-    showLibraryMgmt();
-  } else {
-    libraryPinError.classList.remove("hidden");
-    libraryPinInput.value = "";
-    libraryPinInput.focus();
-  }
-}
-
-function showLibraryMgmt() {
-  libraryPinView.classList.add("hidden");
-  libraryMgmtView.classList.remove("hidden");
-  renderLibraryMgmt();
 }
 
 function renderLibraryMgmt() {

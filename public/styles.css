@@ -774,6 +774,32 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
 
 .photo-modal-overlay { z-index: 210; }
 #pin-gate-overlay    { z-index: 1000; }
+
+/* PIN gate — dot indicator + shake animation */
+.pin-dots {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 6px;
+}
+.pin-dots span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ddd;
+  border: 1.5px solid #bbb;
+  transition: background 0.12s, border-color 0.12s;
+}
+.pin-dots span.dot-filled {
+  background: #40916c;
+  border-color: #40916c;
+}
+@keyframes pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.pin-error-shake { animation: pin-shake 0.35s ease-in-out; }
 .photo-modal-card    { max-width: 440px; }
 
 .photo-modal-body {

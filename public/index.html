@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=28">
+  <link rel="stylesheet" href="styles.css?v=29">
 </head>
 <body>
   <header class="app-header">
@@ -153,7 +153,7 @@
         <button type="button" id="photo-capture-btn" disabled>📷 Tomar foto</button>
         <button type="button" id="photo-confirm-btn" style="display:none">✓ Confirmar</button>
         <button type="button" id="photo-retake-btn" class="secondary" style="display:none">↩ Repetir</button>
-        <button type="button" id="photo-cancel-btn" class="secondary" style="display:none">Omitir foto</button>
+        <button type="button" id="photo-cancel-btn" class="secondary" style="display:none">Cancelar</button>
       </div>
     </div>
   </div>
@@ -216,6 +216,9 @@
       <div class="modal-body library-pin-body">
         <p id="pin-gate-desc" class="library-pin-desc"></p>
         <input type="password" id="pin-gate-input" class="library-pin-input" maxlength="6" placeholder="Código" inputmode="numeric" autocomplete="off">
+        <div class="pin-dots" id="pin-gate-dots" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
         <p id="pin-gate-error" class="library-pin-error hidden">Código incorrecto. Intenta de nuevo.</p>
       </div>
       <div class="modal-foot">
@@ -268,6 +271,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
-  <script src="script.js?v=28"></script>
+  <script src="script.js?v=29"></script>
 </body>
 </html>
