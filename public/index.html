@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=29">
+  <link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
   <header class="app-header">
@@ -14,9 +14,17 @@
         <p>Sucursal: <strong id="header-branch-name">—</strong></p>
         <span id="sync-status" class="sync-status" data-state="busy">Selecciona sucursal...</span>
       </div>
-      <button type="button" id="branch-switch-btn" class="realizadas-open-btn">🏢 Sucursal</button>
-      <button type="button" id="realizadas-btn" class="realizadas-open-btn">📋 Realizadas</button>
-      <button type="button" id="library-btn" class="realizadas-open-btn">⚙️ Tareas</button>
+      <div class="header-actions">
+        <label class="branch-select-wrap" for="branch-select">
+          <span>Sucursal</span>
+          <select id="branch-select" aria-label="Seleccionar sucursal">
+            <option value="">Seleccionar sucursal</option>
+          </select>
+        </label>
+        <button type="button" id="branch-switch-btn" class="realizadas-open-btn">🏢 Sucursales</button>
+        <button type="button" id="realizadas-btn" class="realizadas-open-btn">📋 Realizadas</button>
+        <button type="button" id="library-btn" class="realizadas-open-btn">⚙️ Tareas</button>
+      </div>
     </div>
   </header>
 
@@ -32,6 +40,7 @@
         <p class="branch-loading">Cargando sucursales...</p>
       </div>
       <button type="button" id="branch-settings-btn" class="branch-settings-link">⚙ Administrar sucursales</button>
+      <button type="button" id="branch-selector-close-btn" class="branch-selector-close hidden">Continuar</button>
     </div>
   </div>
 
@@ -271,6 +280,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
-  <script src="script.js?v=29"></script>
+  <script src="script.js?v=30"></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 const DAYS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
 const STORAGE_KEY = "sharp_limpieza_board_v3";
+const BRANCH_CONFIG_STORAGE_KEY = "sharp_limpieza_branch_config_v1";
 const SYNC_DEBOUNCE_MS = 250;
 
 const DEFAULT_BRANCHES = [
@@ -151,6 +152,8 @@ let branches         = [];
 let currentBranch    = null;
 let branchesConfigRef = null;
 let pendingBranchLogin = null;
+let branchConfigReady = false;
+let usingBranchConfigFallback = false;
 
 let _pinFailCount      = 0;   // wrong attempts since last success
 let _pinLockUntil      = 0;   // timestamp ms until PIN gate is unlocked
@@ -166,6 +169,7 @@ const taskFree       = document.getElementById("task-free");
 const addTaskBtn     = document.getElementById("add-task-btn");
 const clearTaskButton   = document.getElementById("clear-task");
 const syncStatus        = document.getElementById("sync-status");
+const branchSelect      = document.getElementById("branch-select");
 const modalOverlay      = document.getElementById("cell-modal-overlay");
 const modalCellLabel    = document.getElementById("modal-cell-label");
 const modalCloseBtn     = document.getElementById("modal-close-btn");
@@ -558,7 +562,23 @@ document.getElementById("branch-switch-btn").addEventListener("click", () => {
   showBranchSelector();
 });
 
+branchSelect.addEventListener("change", () => {
+  const branchId = branchSelect.value;
+  if (!branchId) {
+    syncBranchSelect();
+    showBranchSelector();
+    return;
+  }
+  if (currentBranch && branchId === currentBranch.id) return;
+  const branch = branches.find((b) => b.id === branchId);
+  if (branch) openBranchPinModal(branch);
+  syncBranchSelect();
+});
+
 document.getElementById("branch-settings-btn").addEventListener("click", openBranchSettings);
+document.getElementById("branch-selector-close-btn").addEventListener("click", () => {
+  if (currentBranch) hideBranchSelector();
+});
 
 document.getElementById("branch-pin-confirm-btn").addEventListener("click", confirmBranchPin);
 document.getElementById("branch-pin-cancel-btn").addEventListener("click", closeBranchPinModal);
@@ -579,8 +599,7 @@ document.getElementById("branch-add-new-btn").addEventListener("click", async ()
   if (pin === null) return;
   const trimmedPin = pin.trim();
   if (!trimmedPin) { alert("La contraseña no puede estar vacía."); return; }
-  const id = name.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `branch-${Date.now()}`;
+  const id = slugifyBranchName(name) || `branch-${Date.now()}`;
   if (branches.some((b) => b.id === id)) { alert("Ya existe una sucursal con nombre similar."); return; }
   const allowed = await requireAdmin("Crear nueva sucursal");
   if (!allowed) return;
@@ -1215,7 +1234,7 @@ function normalizeTaskItem(value) {
 function initFirebaseConnection() {
   if (!window.firebase || typeof firebase.initializeApp !== "function" || typeof firebase.database !== "function") {
     setSyncStatus("Modo local", "offline");
-    branches = [...DEFAULT_BRANCHES];
+    branches = loadBranchConfigFromLocal();
     showBranchSelector();
     renderBranchList();
     return;
@@ -1242,10 +1261,18 @@ function initFirebaseConnection() {
 
     initLibrarySync();
     initBranchConfigSync();
+    window.setTimeout(() => {
+      if (branchConfigReady || branches.length > 0) return;
+      usingBranchConfigFallback = true;
+      branches = loadBranchConfigFromLocal();
+      setSyncStatus("Modo local", "offline");
+      renderBranchList();
+      showBranchSelector();
+    }, 5000);
   } catch (err) {
     console.error("Firebase init error", err);
     setSyncStatus("Modo local", "offline");
-    branches = [...DEFAULT_BRANCHES];
+    branches = loadBranchConfigFromLocal();
     showBranchSelector();
     renderBranchList();
   }
@@ -1255,19 +1282,35 @@ function initBranchConfigSync() {
   if (!firebaseDB) return;
   branchesConfigRef = firebaseDB.ref("branchConfig");
   branchesConfigRef.on("value", (snap) => {
+    branchConfigReady = true;
+    usingBranchConfigFallback = false;
     const json = snap.val();
     if (json) {
-      try { branches = JSON.parse(json); } catch (_) { branches = [...DEFAULT_BRANCHES]; }
+      try { branches = normalizeBranchConfig(JSON.parse(json)); } catch (_) { branches = loadBranchConfigFromLocal(); }
     } else {
-      branches = [...DEFAULT_BRANCHES];
+      branches = loadBranchConfigFromLocal();
       branchesConfigRef.set(JSON.stringify(branches)).catch(console.error);
     }
+    persistBranchConfigLocal();
     renderBranchList();
+    syncBranchSelect();
     if (currentBranch) {
       const updated = branches.find((b) => b.id === currentBranch.id);
       if (updated) {
         currentBranch = updated;
         document.getElementById("header-branch-name").textContent = currentBranch.name;
+        updateBranchSelectorClose();
+        syncBranchSelect();
+        if (!remoteBoardRef && firebaseDB) connectBoardSync(currentBranch.id);
+      } else {
+        currentBranch = null;
+        if (remoteBoardRef) { remoteBoardRef.off(); remoteBoardRef = null; }
+        document.getElementById("header-branch-name").textContent = "—";
+        state = createInitialState();
+        selectedCell = null;
+        syncBranchSelect();
+        renderTable();
+        showBranchSelector();
       }
     }
   });
@@ -1275,6 +1318,7 @@ function initBranchConfigSync() {
 }
 
 function showBranchSelector() {
+  updateBranchSelectorClose();
   document.getElementById("branch-selector").classList.remove("hidden");
 }
 
@@ -1284,22 +1328,48 @@ function hideBranchSelector() {
 
 function renderBranchList() {
   const list = document.getElementById("branch-list");
+  syncBranchSelect();
+  updateBranchSelectorClose();
   if (!branches.length) {
     list.innerHTML = '<p class="branch-loading">Sin sucursales configuradas.</p>';
     return;
   }
   list.innerHTML = branches.map((branch) => `
-    <button type="button" class="branch-card" data-branch-id="${escapeHtml(branch.id)}">
+    <button type="button" class="branch-card ${currentBranch && currentBranch.id === branch.id ? "is-current" : ""}" data-branch-id="${escapeHtml(branch.id)}">
       <span class="branch-card-name">${escapeHtml(branch.name)}</span>
-      <span class="branch-card-arrow">›</span>
+      <span class="branch-card-status">${currentBranch && currentBranch.id === branch.id ? "Actual" : "›"}</span>
     </button>
   `).join("");
   list.querySelectorAll(".branch-card").forEach((btn) => {
     btn.addEventListener("click", () => {
       const branch = branches.find((b) => b.id === btn.getAttribute("data-branch-id"));
-      if (branch) openBranchPinModal(branch);
+      if (!branch) return;
+      if (currentBranch && currentBranch.id === branch.id) {
+        hideBranchSelector();
+        return;
+      }
+      openBranchPinModal(branch);
     });
   });
+}
+
+function syncBranchSelect() {
+  if (!branchSelect) return;
+  const currentValue = currentBranch ? currentBranch.id : "";
+  const placeholder = branches.length ? "Seleccionar sucursal" : "Sin sucursales";
+  setSelectOptions(
+    branchSelect,
+    [{ value: "", label: placeholder }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))],
+    currentValue
+  );
+  branchSelect.disabled = branches.length === 0;
+}
+
+function updateBranchSelectorClose() {
+  const closeBtn = document.getElementById("branch-selector-close-btn");
+  if (!closeBtn) return;
+  closeBtn.classList.toggle("hidden", !currentBranch);
+  closeBtn.textContent = currentBranch ? `Continuar en ${currentBranch.name}` : "Continuar";
 }
 
 function openBranchPinModal(branch) {
@@ -1335,9 +1405,11 @@ function enterBranch(branch) {
   document.getElementById("header-branch-name").textContent = branch.name;
   hideBranchSelector();
   state = loadState() || createInitialState();
+  syncBranchSelect();
+  renderBranchList();
   updateTeamSelectors();
   renderTable();
-  if (firebaseDB) {
+  if (firebaseDB && !usingBranchConfigFallback) {
     connectBoardSync(branch.id);
   } else {
     setSyncStatus("Modo local", "offline");
@@ -1441,7 +1513,71 @@ function renderBranchSettings() {
 }
 
 function saveBranchConfig() {
+  branches = normalizeBranchConfig(branches);
+  if (currentBranch) {
+    const updated = branches.find((branch) => branch.id === currentBranch.id);
+    if (updated) {
+      currentBranch = updated;
+      document.getElementById("header-branch-name").textContent = currentBranch.name;
+    } else {
+      currentBranch = null;
+      if (remoteBoardRef) { remoteBoardRef.off(); remoteBoardRef = null; }
+      document.getElementById("header-branch-name").textContent = "—";
+      state = createInitialState();
+      selectedCell = null;
+      renderTable();
+      showBranchSelector();
+    }
+  }
+  persistBranchConfigLocal();
+  syncBranchSelect();
+  updateBranchSelectorClose();
   if (branchesConfigRef) branchesConfigRef.set(JSON.stringify(branches)).catch(console.error);
+}
+
+function loadBranchConfigFromLocal() {
+  try {
+    const raw = localStorage.getItem(BRANCH_CONFIG_STORAGE_KEY);
+    if (!raw) return normalizeBranchConfig(DEFAULT_BRANCHES);
+    return normalizeBranchConfig(JSON.parse(raw));
+  } catch (_) {
+    return normalizeBranchConfig(DEFAULT_BRANCHES);
+  }
+}
+
+function persistBranchConfigLocal() {
+  try {
+    localStorage.setItem(BRANCH_CONFIG_STORAGE_KEY, JSON.stringify(branches));
+  } catch (_) {}
+}
+
+function normalizeBranchConfig(value) {
+  const source = Array.isArray(value) ? value : DEFAULT_BRANCHES;
+  const seen = new Set();
+  const normalized = [];
+
+  for (const branch of source) {
+    if (!branch || typeof branch !== "object") continue;
+    const name = typeof branch.name === "string" ? branch.name.trim() : "";
+    const pin = typeof branch.pin === "string" ? branch.pin.trim() : "";
+    const rawId = typeof branch.id === "string" ? branch.id.trim() : "";
+    const id = rawId || slugifyBranchName(name);
+    if (!id || !name || !pin || seen.has(id)) continue;
+    seen.add(id);
+    normalized.push({ id, name, pin });
+  }
+
+  return normalized.length > 0 ? normalized : DEFAULT_BRANCHES.map((branch) => ({ ...branch }));
+}
+
+function slugifyBranchName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function parseRemoteState(value) {

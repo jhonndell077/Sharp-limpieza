@@ -164,9 +164,51 @@ button.secondary { background: #7d8678; }
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .header-left { flex: 1; min-width: 0; }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: min(100%, 520px);
+}
+
+.branch-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 170px;
+}
+
+.branch-select-wrap span {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.78);
+}
+
+.branch-select-wrap select {
+  min-height: 40px;
+  border: 1.5px solid rgba(255,255,255,0.42);
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  background: rgba(255,255,255,0.95);
+  color: #1b4332;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.branch-select-wrap select:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
 
 .realizadas-open-btn {
   background: rgba(255,255,255,0.2);
@@ -773,7 +815,9 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
 /* ── Evidencia fotográfica ───────────────────────────────── */
 
 .photo-modal-overlay { z-index: 210; }
-#pin-gate-overlay    { z-index: 1000; }
+#branch-pin-overlay,
+#branch-settings-overlay { z-index: 2100; }
+#pin-gate-overlay       { z-index: 2300; }
 
 /* PIN gate — dot indicator + shake animation */
 .pin-dots {
@@ -945,6 +989,8 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
 
   .layout { padding: 0.6rem; }
   .board-section { border-radius: 8px; padding: 0.65rem; }
+  .header-actions { width: 100%; justify-content: flex-start; }
+  .branch-select-wrap { flex: 1 1 190px; }
 
   .table-wrap { overflow-x: visible; }
 
@@ -1032,6 +1078,13 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
 
   .layout { padding: 0.4rem; }
   .board-section { padding: 0.5rem; border-radius: 7px; }
+  .header-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  .branch-select-wrap { grid-column: 1 / -1; min-width: 0; }
+  .realizadas-open-btn { width: 100%; padding-inline: 0.45rem; }
 
   /* Toolbar */
   .input-row { flex-direction: column; }
@@ -1357,9 +1410,13 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
   color: #1b4332;
 }
 .branch-card:hover { border-color: #40916c; background: #e4f2e2; }
+.branch-card.is-current {
+  border-color: #40916c;
+  background: #d8f0d1;
+}
 
 .branch-card-name { font-weight: 700; font-size: 1rem; }
-.branch-card-arrow { font-size: 1.3rem; opacity: 0.5; }
+.branch-card-status { font-size: 0.78rem; font-weight: 800; opacity: 0.72; }
 
 .branch-settings-link {
   background: none !important;
@@ -1376,6 +1433,12 @@ td.task-cell.weekend .cell-btn.done    { background: #b3dfb3; }
   display: block;
 }
 .branch-settings-link:hover { color: #444; filter: none; }
+
+.branch-selector-close {
+  width: 100%;
+  margin-top: 0.6rem;
+  background: #1b4332;
+}
 
 /* ── Branch settings edit forms ──────────────────────────── */
 
