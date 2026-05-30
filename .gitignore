@@ -5,3 +5,4 @@ build/
 Thumbs.db
 .firebase/
 firebase-debug.log
+.claude/
