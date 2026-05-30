@@ -162,6 +162,9 @@ let _pinCountdownTimer = null; // interval id for lockout countdown
 // DOM refs
 const collaboratorForm  = document.getElementById("collaborator-form");
 const collaboratorInput = document.getElementById("collaborator-name");
+const taskSearchInput   = document.getElementById("task-search");
+const taskSearchClear   = document.getElementById("task-search-clear");
+const taskSearchCount   = document.getElementById("task-search-count");
 const scheduleBody      = document.getElementById("schedule-body");
 const taskTeam       = document.getElementById("task-team");
 const taskChecklist  = document.getElementById("task-checklist");
@@ -250,6 +253,20 @@ collaboratorForm.addEventListener("submit", async (event) => {
   collaboratorInput.value = "";
   saveState();
   updateTeamSelectors();
+  renderTable();
+});
+
+taskSearchInput.addEventListener("input", () => {
+  renderTable();
+});
+
+taskSearchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") event.preventDefault();
+});
+
+taskSearchClear.addEventListener("click", () => {
+  taskSearchInput.value = "";
+  taskSearchInput.focus();
   renderTable();
 });
 
@@ -1611,6 +1628,9 @@ function setSyncStatus(message, stateName) {
 // ── Render ────────────────────────────────────────────────────────────
 
 function renderTable() {
+  const searchQuery = getTaskSearchQuery();
+  let searchHitCount = 0;
+
   if (state.collaborators.length === 0) {
     scheduleBody.innerHTML = `
       <tr>
@@ -1618,6 +1638,7 @@ function renderTable() {
           No hay colaboradores. Agrega uno para iniciar.
         </td>
       </tr>`;
+    renderTaskSearchStatus(searchQuery, 0);
     return;
   }
 
@@ -1642,6 +1663,7 @@ function renderTable() {
 
       const weekendClass = dayIndex >= 5 ? "weekend" : "";
       const selectedClass = isSelected ? "selected" : "";
+      let cellHasSearchMatch = false;
 
       let cellContent = "";
       if (isFree) {
@@ -1650,7 +1672,13 @@ function renderTable() {
         cellContent = items.map((item) => {
           const meta = resolveTaskMeta(item);
           const chipDone = item.done ? "chip-done" : "";
-          return `<span class="task-chip ${chipDone}">${meta.legend.symbol} ${escapeHtml(meta.taskName)} · ${escapeHtml(meta.team)}</span>`;
+          const isSearchHit = taskMatchesSearch(meta, searchQuery);
+          if (isSearchHit) {
+            cellHasSearchMatch = true;
+            searchHitCount++;
+          }
+          const searchClass = isSearchHit ? "search-hit" : "";
+          return `<span class="task-chip ${chipDone} ${searchClass}">${meta.legend.symbol} ${escapeHtml(meta.taskName)} · ${escapeHtml(meta.team)}</span>`;
         }).join("");
       } else {
         cellContent = `<span class="task-empty">+ Asignar tarea</span>`;
@@ -1666,7 +1694,7 @@ function renderTable() {
         <td class="task-cell ${weekendClass}" data-day-label="${escapeHtml(DAYS[dayIndex])}">
           <button
             type="button"
-            class="cell-btn ${statusClass} ${selectedClass}"
+            class="cell-btn ${statusClass} ${selectedClass} ${cellHasSearchMatch ? "search-match" : ""}"
             data-cell="1"
             data-collaborator="${collaborator.id}"
             data-day="${dayIndex}"
@@ -1689,6 +1717,8 @@ function renderTable() {
         ${dayCells}
       </tr>`;
   }).join("");
+
+  renderTaskSearchStatus(searchQuery, searchHitCount);
 }
 
 // ── Selectors ─────────────────────────────────────────────────────────
@@ -1728,6 +1758,25 @@ function setSelectOptions(el, options, currentValue) {
     el.append(opt);
   }
   el.value = selected;
+}
+
+function getTaskSearchQuery() {
+  return normalizeText(taskSearchInput?.value || "");
+}
+
+function taskMatchesSearch(meta, query) {
+  if (!query) return false;
+  const searchable = normalizeText(`${meta.taskName} ${meta.team}`);
+  return query.split(" ").filter(Boolean).every((part) => searchable.includes(part));
+}
+
+function renderTaskSearchStatus(query, count) {
+  if (!taskSearchClear || !taskSearchCount) return;
+  taskSearchClear.classList.toggle("hidden", !query);
+  taskSearchCount.textContent = query
+    ? `${count} coincidencia${count === 1 ? "" : "s"}`
+    : "";
+  taskSearchCount.dataset.state = query && count === 0 ? "empty" : "ready";
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharp de Limpieza</title>
-  <link rel="stylesheet" href="styles.css?v=31">
+  <link rel="stylesheet" href="styles.css?v=32">
 </head>
 <body>
   <header class="app-header">
@@ -94,6 +94,14 @@
           <div class="input-row">
             <input id="collaborator-name" name="collaboratorName" type="text" maxlength="40" placeholder="Ej: Daniela" required>
             <button type="submit">Agregar</button>
+          </div>
+          <div class="task-search-row">
+            <label for="task-search">Buscar tarea</label>
+            <div class="task-search-control">
+              <input id="task-search" type="search" maxlength="60" placeholder="Ej: Boca de Biberones" autocomplete="off">
+              <button type="button" id="task-search-clear" class="task-search-clear hidden" aria-label="Limpiar búsqueda">✕</button>
+            </div>
+            <span id="task-search-count" class="task-search-count" aria-live="polite"></span>
           </div>
         </form>
         <button type="button" id="autofill-btn" class="autofill-btn">🎲 Auto-llenar semana</button>
@@ -280,6 +288,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
-  <script src="script.js?v=31"></script>
+  <script src="script.js?v=32"></script>
 </body>
 </html>
