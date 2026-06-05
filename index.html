@@ -18,6 +18,7 @@
           </div>
         </form>
         <button id="load-example" class="secondary" type="button">Cargar ejemplo</button>
+        <button id="open-library" class="secondary" type="button">Equipos y Tareas</button>
       </div>
 
       <div class="table-wrap">
@@ -54,7 +55,10 @@
       <div class="floating-editor-body">
         <label class="floating-field" for="editor-team">
           <span>Equipo a trabajar</span>
-          <select id="editor-team"></select>
+          <div class="team-select-row">
+            <select id="editor-team"></select>
+            <button id="editor-rename-team" type="button" class="rename-team-btn" title="Renombrar equipo">&#9998;</button>
+          </div>
         </label>
 
         <div class="floating-list-head">
@@ -68,6 +72,22 @@
         <button id="editor-clear" type="button" class="editor-warning">LIMPIAR CASILLA</button>
         <button id="editor-cancel" type="button" class="editor-secondary">CANCELAR</button>
         <button id="editor-save" type="button" class="editor-save">GUARDAR CAMBIOS</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="library-backdrop" class="editor-backdrop" hidden>
+    <section class="floating-editor-card" role="dialog" aria-modal="true" aria-labelledby="library-title">
+      <div class="floating-editor-head">
+        <div>
+          <span class="floating-editor-kicker">Biblioteca de Tareas</span>
+          <strong id="library-title">Equipos y Tareas</strong>
+        </div>
+        <button id="library-close" type="button" class="editor-danger" aria-label="Cerrar">X</button>
+      </div>
+      <div class="floating-editor-body" id="library-body"></div>
+      <div class="floating-editor-foot">
+        <button id="library-close-foot" type="button" class="editor-secondary">CERRAR</button>
       </div>
     </section>
   </div>

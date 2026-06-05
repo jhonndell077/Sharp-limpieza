@@ -3,89 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sharp de LuRo</title>
-  <link rel="stylesheet" href="styles.css?v=35">
+  <title>Sharp de Limpieza</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="app-header">
-    <div class="header-top">
-      <div class="header-left">
-        <h1>Sharp de LuRo</h1>
-        <p>Sucursal: <strong id="header-branch-name">—</strong></p>
-        <span id="sync-status" class="sync-status" data-state="busy">Selecciona sucursal...</span>
-      </div>
-      <div class="header-actions">
-        <label class="branch-select-wrap" for="branch-select">
-          <span>Sucursal</span>
-          <select id="branch-select" aria-label="Seleccionar sucursal">
-            <option value="">Seleccionar sucursal</option>
-          </select>
-        </label>
-        <button type="button" id="branch-switch-btn" class="realizadas-open-btn">🏢 Sucursales</button>
-        <button type="button" id="realizadas-btn" class="realizadas-open-btn">📋 Realizadas</button>
-        <button type="button" id="library-btn" class="realizadas-open-btn">⚙️ Tareas</button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Pantalla de selección de sucursal -->
-  <div id="branch-selector" class="branch-selector-overlay">
-    <div class="branch-selector-box">
-      <div class="branch-selector-logo">
-        <h1>Sharp de LuRo</h1>
-        <p>Sistema de gestión de limpieza</p>
-      </div>
-      <h2 class="branch-selector-subtitle">Selecciona tu sucursal</h2>
-      <div id="branch-list" class="branch-list">
-        <p class="branch-loading">Cargando sucursales...</p>
-      </div>
-      <button type="button" id="branch-settings-btn" class="branch-settings-link">⚙ Administrar sucursales</button>
-      <button type="button" id="branch-selector-close-btn" class="branch-selector-close hidden">Continuar</button>
-    </div>
-  </div>
-
-  <!-- Modal: PIN de acceso a sucursal -->
-  <div id="branch-pin-overlay" class="modal-overlay hidden">
-    <div class="modal-card pin-gate-card">
-      <div class="modal-head">
-        <div>
-          <span class="modal-kicker">Acceso a sucursal</span>
-          <strong id="branch-pin-name">—</strong>
-        </div>
-        <button type="button" id="branch-pin-close-btn" class="modal-close-btn">✕</button>
-      </div>
-      <div class="modal-body library-pin-body">
-        <p class="library-pin-desc">Ingresa la contraseña de esta sucursal.</p>
-        <input type="password" id="branch-pin-input" class="library-pin-input" maxlength="6" placeholder="Contraseña" inputmode="numeric" autocomplete="off">
-        <p id="branch-pin-error" class="library-pin-error hidden">Contraseña incorrecta.</p>
-      </div>
-      <div class="modal-foot">
-        <button type="button" id="branch-pin-confirm-btn">Entrar</button>
-        <button type="button" id="branch-pin-cancel-btn" class="secondary">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Administrar sucursales (admin) -->
-  <div id="branch-settings-overlay" class="modal-overlay hidden">
-    <div class="modal-card library-modal-card">
-      <div id="branch-settings-view" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
-        <div class="modal-head">
-          <div>
-            <span class="modal-kicker">Configuración</span>
-            <strong>Sucursales</strong>
-          </div>
-          <button type="button" id="branch-settings-close-btn" class="modal-close-btn">✕</button>
-        </div>
-        <div id="branch-settings-body" class="modal-body library-mgmt-body"></div>
-        <div class="modal-foot">
-          <button type="button" id="branch-add-new-btn">+ Nueva sucursal</button>
-          <button type="button" id="branch-settings-done-btn" class="secondary">Cerrar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <main class="layout">
     <section class="board-section">
       <div class="toolbar">
@@ -95,23 +16,9 @@
             <input id="collaborator-name" name="collaboratorName" type="text" maxlength="40" placeholder="Ej: Daniela" required>
             <button type="submit">Agregar</button>
           </div>
-          <div class="task-search-row">
-            <label for="task-search">Buscar tarea</label>
-            <div class="task-search-control">
-              <input id="task-search" type="search" maxlength="60" placeholder="Ej: Boca de Biberones" autocomplete="off">
-              <button type="button" id="task-search-clear" class="task-search-clear hidden" aria-label="Limpiar búsqueda">✕</button>
-            </div>
-            <span id="task-search-count" class="task-search-count" aria-live="polite"></span>
-          </div>
         </form>
-        <button type="button" id="autofill-btn" class="autofill-btn">🎲 Auto-llenar semana</button>
-        <button type="button" id="clear-all-users-btn" class="clear-users-btn">🗑 Eliminar todos los usuarios</button>
-      </div>
-
-      <div class="week-nav">
-        <button type="button" id="week-prev-btn" class="week-nav-btn" title="Semana anterior">&#8249;</button>
-        <h2 id="week-range" class="week-range-title"></h2>
-        <button type="button" id="week-next-btn" class="week-nav-btn" title="Semana siguiente">&#8250;</button>
+        <button id="load-example" class="secondary" type="button">Cargar ejemplo</button>
+        <button id="open-library" class="secondary" type="button">Equipos y Tareas</button>
       </div>
 
       <div class="table-wrap">
@@ -124,8 +31,8 @@
               <th>Miercoles</th>
               <th>Jueves</th>
               <th>Viernes</th>
-              <th class="weekend">Sabado</th>
-              <th class="weekend">Domingo</th>
+              <th>Sabado</th>
+              <th>Domingo</th>
             </tr>
           </thead>
           <tbody id="schedule-body"></tbody>
@@ -134,161 +41,59 @@
     </section>
   </main>
 
-  <!-- Panel lateral: Realizadas -->
-  <div id="realizadas-panel" class="realizadas-panel hidden">
-    <div class="realizadas-backdrop"></div>
-    <div class="realizadas-drawer">
-      <div class="realizadas-head">
-        <div class="realizadas-head-left">
-          <strong>📋 Realizadas</strong>
-          <span id="realizadas-week-label" class="realizadas-week-label"></span>
-        </div>
-        <button type="button" id="realizadas-close-btn" class="realizadas-close-btn">✕</button>
-      </div>
-      <div id="realizadas-body" class="realizadas-body"></div>
-    </div>
-  </div>
-
-  <!-- Modal de evidencia fotográfica -->
-  <div id="photo-modal-overlay" class="modal-overlay photo-modal-overlay hidden">
-    <div class="modal-card photo-modal-card">
-      <div class="modal-head">
+  <div id="editor-backdrop" class="editor-backdrop" hidden>
+    <section class="floating-editor-card" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+      <div class="floating-editor-head">
         <div>
-          <span class="modal-kicker">Evidencia de tarea</span>
-          <strong id="photo-modal-label">-</strong>
+          <span class="floating-editor-kicker">Editor de tareas</span>
+          <strong id="editor-title">Editar casilla</strong>
+          <p id="editor-subtitle"></p>
         </div>
-        <button type="button" id="photo-modal-close-btn" class="modal-close-btn">✕</button>
+        <button id="editor-close" type="button" class="editor-danger" aria-label="Cerrar editor">X</button>
       </div>
-      <div class="photo-modal-body">
-        <div class="photo-camera-wrap">
-          <video id="photo-video" autoplay muted playsinline></video>
-          <canvas id="photo-canvas"></canvas>
-          <div id="photo-overlay-msg" class="photo-overlay-msg"></div>
-        </div>
-        <p id="photo-status-text" class="photo-status-text">Iniciando cámara...</p>
-      </div>
-      <div class="modal-foot" id="photo-modal-foot">
-        <button type="button" id="photo-capture-btn" disabled>📷 Tomar foto</button>
-        <button type="button" id="photo-confirm-btn" style="display:none">✓ Confirmar</button>
-        <button type="button" id="photo-retake-btn" class="secondary" style="display:none">↩ Repetir</button>
-        <button type="button" id="photo-cancel-btn" class="secondary" style="display:none">Cancelar</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Modal flotante -->
-  <div id="cell-modal-overlay" class="modal-overlay hidden">
-    <div class="modal-card">
-      <div class="modal-head">
-        <div>
-          <span class="modal-kicker">Tareas del dia</span>
-          <strong id="modal-cell-label">-</strong>
-        </div>
-        <button type="button" id="modal-close-btn" class="modal-close-btn">✕</button>
-      </div>
-      <div class="modal-body">
-
-        <!-- Lista de tareas actuales -->
-        <div id="modal-task-list" class="modal-task-list"></div>
-
-        <!-- Formulario para agregar tarea -->
-        <div class="modal-add-section">
-          <strong class="modal-section-title">Agregar tareas</strong>
-          <label class="modal-field">
-            <span>Paso 1 — Equipo</span>
-            <select id="task-team"></select>
-          </label>
-          <div class="modal-field">
-            <span class="modal-field-label">Paso 2 — Selecciona las tareas</span>
-            <div id="task-checklist" class="task-checklist">
-              <p class="checklist-empty">Selecciona un equipo primero.</p>
-            </div>
+      <div class="floating-editor-body">
+        <label class="floating-field" for="editor-team">
+          <span>Equipo a trabajar</span>
+          <div class="team-select-row">
+            <select id="editor-team"></select>
+            <button id="editor-rename-team" type="button" class="rename-team-btn" title="Renombrar equipo">&#9998;</button>
           </div>
-          <button type="button" id="add-task-btn" disabled>+ Agregar seleccionadas</button>
-        </div>
-
-        <!-- Libre -->
-        <label class="checkbox-row modal-free-row" for="task-free">
-          <input id="task-free" type="checkbox">
-          Colaborador libre (FREE — no trabaja este dia)
         </label>
 
+        <div class="floating-list-head">
+          <strong>Tareas disponibles</strong>
+        </div>
+
+        <div id="editor-task-list" class="task-checklist"></div>
       </div>
-      <div class="modal-foot">
-        <button type="button" id="clear-task" class="btn-danger">Limpiar todo</button>
-        <button type="button" id="modal-cancel-btn" class="secondary">Cerrar</button>
+
+      <div class="floating-editor-foot">
+        <button id="editor-clear" type="button" class="editor-warning">LIMPIAR CASILLA</button>
+        <button id="editor-cancel" type="button" class="editor-secondary">CANCELAR</button>
+        <button id="editor-save" type="button" class="editor-save">GUARDAR CAMBIOS</button>
       </div>
-    </div>
+    </section>
   </div>
 
-  <!-- Modal: PIN de acceso para acciones protegidas -->
-  <div id="pin-gate-overlay" class="modal-overlay hidden">
-    <div class="modal-card pin-gate-card">
-      <div class="modal-head">
+  <div id="library-backdrop" class="editor-backdrop" hidden>
+    <section class="floating-editor-card" role="dialog" aria-modal="true" aria-labelledby="library-title">
+      <div class="floating-editor-head">
         <div>
-          <span class="modal-kicker">Acción protegida</span>
-          <strong id="pin-gate-title">Verificar acceso</strong>
+          <span class="floating-editor-kicker">Biblioteca de Tareas</span>
+          <strong id="library-title">Equipos y Tareas</strong>
         </div>
-        <button type="button" id="pin-gate-close-btn" class="modal-close-btn">✕</button>
+        <button id="library-close" type="button" class="editor-danger" aria-label="Cerrar">X</button>
       </div>
-      <div class="modal-body library-pin-body">
-        <p id="pin-gate-desc" class="library-pin-desc"></p>
-        <input type="password" id="pin-gate-input" class="library-pin-input" maxlength="6" placeholder="Código" inputmode="numeric" autocomplete="off">
-        <div class="pin-dots" id="pin-gate-dots" aria-hidden="true">
-          <span></span><span></span><span></span><span></span><span></span><span></span>
-        </div>
-        <p id="pin-gate-error" class="library-pin-error hidden">Código incorrecto. Intenta de nuevo.</p>
+      <div class="floating-editor-body" id="library-body"></div>
+      <div class="floating-editor-foot">
+        <button id="library-close-foot" type="button" class="editor-secondary">CERRAR</button>
       </div>
-      <div class="modal-foot">
-        <button type="button" id="pin-gate-confirm-btn">Verificar</button>
-        <button type="button" id="pin-gate-cancel-btn" class="secondary">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Biblioteca de Tareas -->
-  <div id="library-modal-overlay" class="modal-overlay hidden">
-    <div class="modal-card library-modal-card">
-      <!-- PIN view -->
-      <div id="library-pin-view">
-        <div class="modal-head">
-          <div>
-            <span class="modal-kicker">Acceso restringido</span>
-            <strong>Gestión de Tareas</strong>
-          </div>
-          <button type="button" id="library-pin-close-btn" class="modal-close-btn">✕</button>
-        </div>
-        <div class="modal-body library-pin-body">
-          <p class="library-pin-desc">Ingresa el código para gestionar equipos y tareas.</p>
-          <input type="password" id="library-pin-input" class="library-pin-input" maxlength="6" placeholder="Código de acceso" inputmode="numeric" autocomplete="off">
-          <p id="library-pin-error" class="library-pin-error hidden">Código incorrecto. Intenta de nuevo.</p>
-        </div>
-        <div class="modal-foot">
-          <button type="button" id="library-pin-verify-btn">Verificar</button>
-          <button type="button" id="library-pin-cancel-btn" class="secondary">Cancelar</button>
-        </div>
-      </div>
-      <!-- Management view -->
-      <div id="library-mgmt-view" class="hidden">
-        <div class="modal-head">
-          <div>
-            <span class="modal-kicker">Biblioteca de tareas</span>
-            <strong>Equipos y Tareas</strong>
-          </div>
-          <button type="button" id="library-mgmt-close-btn" class="modal-close-btn">✕</button>
-        </div>
-        <div id="library-mgmt-body" class="modal-body library-mgmt-body"></div>
-        <div class="modal-foot">
-          <button type="button" id="library-add-team-btn">+ Nuevo equipo</button>
-          <button type="button" id="library-mgmt-cancel-btn" class="secondary">Cerrar</button>
-        </div>
-      </div>
-    </div>
+    </section>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
-  <script src="script.js?v=35"></script>
+  <script src="script.js"></script>
 </body>
 </html>

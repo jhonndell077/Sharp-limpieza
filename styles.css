@@ -348,7 +348,7 @@ td.task-cell {
 
 .checklist-item {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 0.48rem;
   min-height: 48px;
@@ -432,6 +432,109 @@ td.task-cell {
   margin: 0;
   color: #7a8677;
   font-style: italic;
+}
+
+.team-select-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.team-select-row select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.rename-team-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #bcc7b7;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.rename-task-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #bcc7b7;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.library-team {
+  border: 1px solid #d0dac9;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.library-team-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--green);
+}
+
+.library-team-head strong {
+  font-size: 1rem;
+  color: #0d1a08;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.library-rename-team-btn {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid rgba(0,0,0,0.25);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.22);
+  color: #0d1a08;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.library-task-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.85rem;
+  border-top: 1px solid #e8ede5;
+}
+
+.library-task-row:nth-child(even) {
+  background: #f7faf5;
+}
+
+.library-task-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.library-rename-task-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #bcc7b7;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 400;
+  line-height: 1;
 }
 
 @media (max-width: 920px) {
@@ -601,5 +704,10 @@ td.task-cell {
     grid-column: 3;
     justify-self: start;
     white-space: normal;
+  }
+
+  .rename-task-btn {
+    grid-column: 3;
+    justify-self: end;
   }
 }

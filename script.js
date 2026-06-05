@@ -176,6 +176,12 @@ const editorCloseButton = document.getElementById("editor-close");
 const editorCancelButton = document.getElementById("editor-cancel");
 const editorClearButton = document.getElementById("editor-clear");
 const editorSaveButton = document.getElementById("editor-save");
+const editorRenameTeamButton = document.getElementById("editor-rename-team");
+const libraryBackdrop = document.getElementById("library-backdrop");
+const libraryBody = document.getElementById("library-body");
+const libraryCloseButton = document.getElementById("library-close");
+const libraryCloseFootButton = document.getElementById("library-close-foot");
+const openLibraryButton = document.getElementById("open-library");
 
 let state = loadState() || createExampleState();
 let selectedCell = null;
@@ -261,8 +267,34 @@ editorBackdrop.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && isEditorOpen()) {
-    closeTaskEditor();
+  if (event.key === "Escape") {
+    if (isEditorOpen()) {
+      closeTaskEditor();
+    } else if (!libraryBackdrop.hidden) {
+      closeLibrary();
+    }
+  }
+});
+
+openLibraryButton.addEventListener("click", openLibrary);
+libraryCloseButton.addEventListener("click", closeLibrary);
+libraryCloseFootButton.addEventListener("click", closeLibrary);
+libraryBackdrop.addEventListener("click", (event) => {
+  if (event.target === libraryBackdrop) closeLibrary();
+});
+
+libraryBody.addEventListener("click", (event) => {
+  const renameTeamBtn = event.target.closest("[data-lib-rename-team]");
+  if (renameTeamBtn) {
+    handleRenameTeam(renameTeamBtn.getAttribute("data-lib-rename-team"));
+    return;
+  }
+  const renameTaskBtn = event.target.closest("[data-lib-rename-task]");
+  if (renameTaskBtn) {
+    handleRenameTask(
+      renameTaskBtn.getAttribute("data-lib-rename-team"),
+      renameTaskBtn.getAttribute("data-lib-rename-task")
+    );
   }
 });
 
@@ -280,6 +312,22 @@ editorSaveButton.addEventListener("click", () => {
   saveEditorSelection();
 });
 
+editorRenameTeamButton.addEventListener("click", () => {
+  handleRenameTeam(editorTeam.value);
+});
+
+editorTaskList.addEventListener("click", (event) => {
+  const renameBtn = event.target.closest("[data-rename-task]");
+  if (renameBtn) {
+    event.stopPropagation();
+    event.preventDefault();
+    handleRenameTask(
+      renameBtn.getAttribute("data-rename-team"),
+      renameBtn.getAttribute("data-rename-task")
+    );
+  }
+}, true);
+
 function createExampleState() {
   const collaborators = ["Daniela", "Victor", "Erick", "Sabrina", "Jhonn"].map((name) => ({
     id: createId(),
@@ -293,7 +341,7 @@ function createExampleState() {
   putTask(tasks, collaborators[3].id, 3, "Freidora", "tuberia", true);
   putTask(tasks, collaborators[4].id, 2, "Grill", "malla", false);
 
-  return { collaborators, tasks };
+  return { collaborators, tasks, customTaskNames: {}, customTeamNames: {} };
 }
 
 function putTask(tasks, collaboratorId, dayIndex, team, taskId, done) {
@@ -464,7 +512,13 @@ function normalizeState(parsed) {
     }
   }
 
-  return { collaborators, tasks };
+  const customTaskNames = parsed.customTaskNames && typeof parsed.customTaskNames === "object" && !Array.isArray(parsed.customTaskNames)
+    ? { ...parsed.customTaskNames }
+    : {};
+  const customTeamNames = parsed.customTeamNames && typeof parsed.customTeamNames === "object" && !Array.isArray(parsed.customTeamNames)
+    ? { ...parsed.customTeamNames }
+    : {};
+  return { collaborators, tasks, customTaskNames, customTeamNames };
 }
 
 function normalizeAssignment(value) {
@@ -753,7 +807,7 @@ function renderEditor() {
 
   setSelectOptions(
     editorTeam,
-    TEAM_NAMES.map((team) => ({ value: team, label: team })),
+    TEAM_NAMES.map((team) => ({ value: team, label: getTeamDisplayName(team) })),
     selectedEditorTeam
   );
 
@@ -812,9 +866,16 @@ function renderEditorTasks() {
           ${disabled ? "disabled" : ""}
         >
         <span>${legend.symbol}</span>
-        <span class="checklist-name">${escapeHtml(task.name)}</span>
+        <span class="checklist-name">${escapeHtml(getTaskDisplayName(team, task.id))}</span>
         <span class="checklist-assignee">${escapeHtml(assignee)}</span>
         <span class="checklist-freq">${escapeHtml(legend.short)}</span>
+        <button
+          type="button"
+          class="rename-task-btn"
+          data-rename-task="${escapeHtml(task.id)}"
+          data-rename-team="${escapeHtml(team)}"
+          title="Renombrar tarea"
+        >&#9998;</button>
       </label>
     `;
   }).join("");
@@ -950,6 +1011,15 @@ function findCollaborator(collaboratorId) {
   return state.collaborators.find((item) => item.id === collaboratorId) || null;
 }
 
+function getTaskDisplayName(team, taskId) {
+  const key = buildTaskLockKey(team, taskId);
+  return (state.customTaskNames && state.customTaskNames[key]) || findTask(team, taskId)?.name || taskId;
+}
+
+function getTeamDisplayName(team) {
+  return (state.customTeamNames && state.customTeamNames[team]) || team;
+}
+
 function resolveTaskMeta(item) {
   const team = item.team && item.team.trim() ? item.team.trim() : "Sin equipo";
   const task = findTask(team, item.taskId);
@@ -957,8 +1027,8 @@ function resolveTaskMeta(item) {
   if (task) {
     const legend = LEGEND[task.color] || LEGEND.none;
     return {
-      team,
-      taskName: task.name,
+      team: getTeamDisplayName(team),
+      taskName: getTaskDisplayName(team, item.taskId),
       legend
     };
   }
@@ -968,7 +1038,7 @@ function resolveTaskMeta(item) {
     : "Tarea sin catalogo";
   const colorKey = LEGEND[item.colorKey] ? item.colorKey : "none";
   return {
-    team,
+    team: getTeamDisplayName(team),
     taskName: fallbackText,
     legend: LEGEND[colorKey]
   };
@@ -1071,6 +1141,95 @@ function createId() {
     return crypto.randomUUID();
   }
   return `id_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
+function openLibrary() {
+  libraryBackdrop.hidden = false;
+  document.body.classList.add("modal-open");
+  renderLibrary();
+}
+
+function closeLibrary() {
+  libraryBackdrop.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+function renderLibrary() {
+  libraryBody.innerHTML = TEAM_NAMES.map((team) => {
+    const displayName = getTeamDisplayName(team);
+    const tasks = TASK_LIBRARY[team] || [];
+
+    const taskRows = tasks.map((task) => {
+      const taskName = getTaskDisplayName(team, task.id);
+      const legend = LEGEND[task.color] || LEGEND.none;
+      return `
+        <div class="library-task-row">
+          <span class="library-task-name">${legend.symbol} ${escapeHtml(taskName)}</span>
+          <span class="checklist-freq">${escapeHtml(legend.short)}</span>
+          <button
+            type="button"
+            class="library-rename-task-btn"
+            data-lib-rename-task="${escapeHtml(task.id)}"
+            data-lib-rename-team="${escapeHtml(team)}"
+            title="Renombrar tarea"
+          >&#9998;</button>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="library-team">
+        <div class="library-team-head">
+          <strong>${escapeHtml(displayName)}</strong>
+          <button
+            type="button"
+            class="library-rename-team-btn"
+            data-lib-rename-team="${escapeHtml(team)}"
+            title="Renombrar equipo"
+          >&#9998; Renombrar</button>
+        </div>
+        ${taskRows}
+      </div>
+    `;
+  }).join("");
+}
+
+function handleRenameTask(team, taskId) {
+  if (!findTask(team, taskId)) return;
+  const current = getTaskDisplayName(team, taskId);
+  const newName = window.prompt("Nuevo nombre para la tarea:", current);
+  if (newName === null) return;
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+  if (!state.customTaskNames) state.customTaskNames = {};
+  const key = buildTaskLockKey(team, taskId);
+  const original = findTask(team, taskId).name;
+  if (trimmed === original) {
+    delete state.customTaskNames[key];
+  } else {
+    state.customTaskNames[key] = trimmed;
+  }
+  saveState();
+  renderAll();
+  if (!libraryBackdrop.hidden) renderLibrary();
+}
+
+function handleRenameTeam(team) {
+  if (!hasTeam(team)) return;
+  const current = getTeamDisplayName(team);
+  const newName = window.prompt("Nuevo nombre para el equipo:", current);
+  if (newName === null) return;
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+  if (!state.customTeamNames) state.customTeamNames = {};
+  if (trimmed === team) {
+    delete state.customTeamNames[team];
+  } else {
+    state.customTeamNames[team] = trimmed;
+  }
+  saveState();
+  renderAll();
+  if (!libraryBackdrop.hidden) renderLibrary();
 }
 
 function escapeHtml(value) {
