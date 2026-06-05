@@ -177,6 +177,11 @@ const editorCancelButton = document.getElementById("editor-cancel");
 const editorClearButton = document.getElementById("editor-clear");
 const editorSaveButton = document.getElementById("editor-save");
 const editorRenameTeamButton = document.getElementById("editor-rename-team");
+const libraryBackdrop = document.getElementById("library-backdrop");
+const libraryBody = document.getElementById("library-body");
+const libraryCloseButton = document.getElementById("library-close");
+const libraryCloseFootButton = document.getElementById("library-close-foot");
+const openLibraryButton = document.getElementById("open-library");
 
 let state = loadState() || createExampleState();
 let selectedCell = null;
@@ -262,8 +267,34 @@ editorBackdrop.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && isEditorOpen()) {
-    closeTaskEditor();
+  if (event.key === "Escape") {
+    if (isEditorOpen()) {
+      closeTaskEditor();
+    } else if (!libraryBackdrop.hidden) {
+      closeLibrary();
+    }
+  }
+});
+
+openLibraryButton.addEventListener("click", openLibrary);
+libraryCloseButton.addEventListener("click", closeLibrary);
+libraryCloseFootButton.addEventListener("click", closeLibrary);
+libraryBackdrop.addEventListener("click", (event) => {
+  if (event.target === libraryBackdrop) closeLibrary();
+});
+
+libraryBody.addEventListener("click", (event) => {
+  const renameTeamBtn = event.target.closest("[data-lib-rename-team]");
+  if (renameTeamBtn) {
+    handleRenameTeam(renameTeamBtn.getAttribute("data-lib-rename-team"));
+    return;
+  }
+  const renameTaskBtn = event.target.closest("[data-lib-rename-task]");
+  if (renameTaskBtn) {
+    handleRenameTask(
+      renameTaskBtn.getAttribute("data-lib-rename-team"),
+      renameTaskBtn.getAttribute("data-lib-rename-task")
+    );
   }
 });
 
@@ -1112,6 +1143,57 @@ function createId() {
   return `id_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 }
 
+function openLibrary() {
+  libraryBackdrop.hidden = false;
+  document.body.classList.add("modal-open");
+  renderLibrary();
+}
+
+function closeLibrary() {
+  libraryBackdrop.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+function renderLibrary() {
+  libraryBody.innerHTML = TEAM_NAMES.map((team) => {
+    const displayName = getTeamDisplayName(team);
+    const tasks = TASK_LIBRARY[team] || [];
+
+    const taskRows = tasks.map((task) => {
+      const taskName = getTaskDisplayName(team, task.id);
+      const legend = LEGEND[task.color] || LEGEND.none;
+      return `
+        <div class="library-task-row">
+          <span class="library-task-name">${legend.symbol} ${escapeHtml(taskName)}</span>
+          <span class="checklist-freq">${escapeHtml(legend.short)}</span>
+          <button
+            type="button"
+            class="library-rename-task-btn"
+            data-lib-rename-task="${escapeHtml(task.id)}"
+            data-lib-rename-team="${escapeHtml(team)}"
+            title="Renombrar tarea"
+          >&#9998;</button>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="library-team">
+        <div class="library-team-head">
+          <strong>${escapeHtml(displayName)}</strong>
+          <button
+            type="button"
+            class="library-rename-team-btn"
+            data-lib-rename-team="${escapeHtml(team)}"
+            title="Renombrar equipo"
+          >&#9998; Renombrar</button>
+        </div>
+        ${taskRows}
+      </div>
+    `;
+  }).join("");
+}
+
 function handleRenameTask(team, taskId) {
   if (!findTask(team, taskId)) return;
   const current = getTaskDisplayName(team, taskId);
@@ -1128,7 +1210,8 @@ function handleRenameTask(team, taskId) {
     state.customTaskNames[key] = trimmed;
   }
   saveState();
-  renderEditorTasks();
+  renderAll();
+  if (!libraryBackdrop.hidden) renderLibrary();
 }
 
 function handleRenameTeam(team) {
@@ -1145,7 +1228,8 @@ function handleRenameTeam(team) {
     state.customTeamNames[team] = trimmed;
   }
   saveState();
-  renderEditor();
+  renderAll();
+  if (!libraryBackdrop.hidden) renderLibrary();
 }
 
 function escapeHtml(value) {
