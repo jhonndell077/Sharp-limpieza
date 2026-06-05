@@ -176,6 +176,7 @@ const editorCloseButton = document.getElementById("editor-close");
 const editorCancelButton = document.getElementById("editor-cancel");
 const editorClearButton = document.getElementById("editor-clear");
 const editorSaveButton = document.getElementById("editor-save");
+const editorRenameTeamButton = document.getElementById("editor-rename-team");
 
 let state = loadState() || createExampleState();
 let selectedCell = null;
@@ -280,6 +281,22 @@ editorSaveButton.addEventListener("click", () => {
   saveEditorSelection();
 });
 
+editorRenameTeamButton.addEventListener("click", () => {
+  handleRenameTeam(editorTeam.value);
+});
+
+editorTaskList.addEventListener("click", (event) => {
+  const renameBtn = event.target.closest("[data-rename-task]");
+  if (renameBtn) {
+    event.stopPropagation();
+    event.preventDefault();
+    handleRenameTask(
+      renameBtn.getAttribute("data-rename-team"),
+      renameBtn.getAttribute("data-rename-task")
+    );
+  }
+}, true);
+
 function createExampleState() {
   const collaborators = ["Daniela", "Victor", "Erick", "Sabrina", "Jhonn"].map((name) => ({
     id: createId(),
@@ -293,7 +310,7 @@ function createExampleState() {
   putTask(tasks, collaborators[3].id, 3, "Freidora", "tuberia", true);
   putTask(tasks, collaborators[4].id, 2, "Grill", "malla", false);
 
-  return { collaborators, tasks };
+  return { collaborators, tasks, customTaskNames: {}, customTeamNames: {} };
 }
 
 function putTask(tasks, collaboratorId, dayIndex, team, taskId, done) {
@@ -464,7 +481,13 @@ function normalizeState(parsed) {
     }
   }
 
-  return { collaborators, tasks };
+  const customTaskNames = parsed.customTaskNames && typeof parsed.customTaskNames === "object" && !Array.isArray(parsed.customTaskNames)
+    ? { ...parsed.customTaskNames }
+    : {};
+  const customTeamNames = parsed.customTeamNames && typeof parsed.customTeamNames === "object" && !Array.isArray(parsed.customTeamNames)
+    ? { ...parsed.customTeamNames }
+    : {};
+  return { collaborators, tasks, customTaskNames, customTeamNames };
 }
 
 function normalizeAssignment(value) {
@@ -753,7 +776,7 @@ function renderEditor() {
 
   setSelectOptions(
     editorTeam,
-    TEAM_NAMES.map((team) => ({ value: team, label: team })),
+    TEAM_NAMES.map((team) => ({ value: team, label: getTeamDisplayName(team) })),
     selectedEditorTeam
   );
 
@@ -812,9 +835,16 @@ function renderEditorTasks() {
           ${disabled ? "disabled" : ""}
         >
         <span>${legend.symbol}</span>
-        <span class="checklist-name">${escapeHtml(task.name)}</span>
+        <span class="checklist-name">${escapeHtml(getTaskDisplayName(team, task.id))}</span>
         <span class="checklist-assignee">${escapeHtml(assignee)}</span>
         <span class="checklist-freq">${escapeHtml(legend.short)}</span>
+        <button
+          type="button"
+          class="rename-task-btn"
+          data-rename-task="${escapeHtml(task.id)}"
+          data-rename-team="${escapeHtml(team)}"
+          title="Renombrar tarea"
+        >&#9998;</button>
       </label>
     `;
   }).join("");
@@ -950,6 +980,15 @@ function findCollaborator(collaboratorId) {
   return state.collaborators.find((item) => item.id === collaboratorId) || null;
 }
 
+function getTaskDisplayName(team, taskId) {
+  const key = buildTaskLockKey(team, taskId);
+  return (state.customTaskNames && state.customTaskNames[key]) || findTask(team, taskId)?.name || taskId;
+}
+
+function getTeamDisplayName(team) {
+  return (state.customTeamNames && state.customTeamNames[team]) || team;
+}
+
 function resolveTaskMeta(item) {
   const team = item.team && item.team.trim() ? item.team.trim() : "Sin equipo";
   const task = findTask(team, item.taskId);
@@ -957,8 +996,8 @@ function resolveTaskMeta(item) {
   if (task) {
     const legend = LEGEND[task.color] || LEGEND.none;
     return {
-      team,
-      taskName: task.name,
+      team: getTeamDisplayName(team),
+      taskName: getTaskDisplayName(team, item.taskId),
       legend
     };
   }
@@ -968,7 +1007,7 @@ function resolveTaskMeta(item) {
     : "Tarea sin catalogo";
   const colorKey = LEGEND[item.colorKey] ? item.colorKey : "none";
   return {
-    team,
+    team: getTeamDisplayName(team),
     taskName: fallbackText,
     legend: LEGEND[colorKey]
   };
@@ -1071,6 +1110,42 @@ function createId() {
     return crypto.randomUUID();
   }
   return `id_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
+function handleRenameTask(team, taskId) {
+  if (!findTask(team, taskId)) return;
+  const current = getTaskDisplayName(team, taskId);
+  const newName = window.prompt("Nuevo nombre para la tarea:", current);
+  if (newName === null) return;
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+  if (!state.customTaskNames) state.customTaskNames = {};
+  const key = buildTaskLockKey(team, taskId);
+  const original = findTask(team, taskId).name;
+  if (trimmed === original) {
+    delete state.customTaskNames[key];
+  } else {
+    state.customTaskNames[key] = trimmed;
+  }
+  saveState();
+  renderEditorTasks();
+}
+
+function handleRenameTeam(team) {
+  if (!hasTeam(team)) return;
+  const current = getTeamDisplayName(team);
+  const newName = window.prompt("Nuevo nombre para el equipo:", current);
+  if (newName === null) return;
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+  if (!state.customTeamNames) state.customTeamNames = {};
+  if (trimmed === team) {
+    delete state.customTeamNames[team];
+  } else {
+    state.customTeamNames[team] = trimmed;
+  }
+  saveState();
+  renderEditor();
 }
 
 function escapeHtml(value) {
